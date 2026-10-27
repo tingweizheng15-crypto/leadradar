@@ -1,20 +1,9 @@
 {
-  "name": "leadradar",
-  "version": "2.1.0",
-  "type": "module",
-  "description": "B2B 外贸获客：真实搜索发现 + 联系方式挖掘 + 每日定时报告（精确到秒）",
-  "scripts": {
-    "run": "node run.mjs",
-    "daily": "node daily/run.mjs",
-    "schedule": "node scheduler.mjs",
-    "next": "node scheduler.mjs --next",
-    "register": "node scheduler.mjs --register-task",
-    "doctor": "node doctor.mjs",
-    "console": "node console/server.mjs",
-    "build:exe": "node build/build-exe.mjs"
-  },
-  "engines": {
-    "node": ">=18"
-  },
-  "license": "MIT"
+  "name":"leadradar-desktop",
+  "version":"3.2.0",
+  "type":"module",
+  "description":"Evidence-based B2B lead research desktop app",
+  "scripts":{"start":"node server.mjs","run":"node run.mjs","test":"node --test tests/regression.test.mjs","schedule":"node scheduler.mjs"},
+  "engines":{"node":">=24.5.0"},
+  "license":"MIT"
 }

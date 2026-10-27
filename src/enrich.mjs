@@ -2,12 +2,12 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import fs from "node:fs";
 import path from "node:path";
-import { ROOT } from "./config.mjs";
-import { proxiedFetch, resolveProxy } from "./net.mjs";
+import { ROOT, emailFinderReady } from "./config.mjs";
+import { proxiedFetch, resolveProxy, safeUrl, redactError } from "./net.mjs";
 
 const execFileP = promisify(execFile);
 
-export function findChrome() {
+function findChrome() {
   if (process.env.CHROME_PATH) return process.env.CHROME_PATH;
   const candidates = process.platform === "win32"
     ? [
@@ -21,27 +21,13 @@ export function findChrome() {
         "/usr/bin/chromium",
         "/usr/bin/chromium-browser",
         "/usr/bin/microsoft-edge",
-        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
       ];
   for (const p of candidates) if (fs.existsSync(p)) return p;
   return "";
 }
-export const CHROME = findChrome();
+const CHROME = findChrome();
 
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
-
-const ENTITIES = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", ndash: "–", mdash: "—", hellip: "…", rsquo: "’", lsquo: "‘", ldquo: "“", rdquo: "”", middot: "·", bull: "•", copy: "©", reg: "®", trade: "™", deg: "°", euro: "€", pound: "£", yen: "¥" };
-
-/** 解码 HTML 实体：标题里常见 &amp; &ndash; &#8211; 这类，直接进 CSV 会变成脏数据 */
-export function decodeEntities(s) {
-  return String(s || "")
-    .replace(/&#x([0-9a-f]+);/gi, (_, h) => safeFromCode(parseInt(h, 16)))
-    .replace(/&#(\d+);/g, (_, d) => safeFromCode(parseInt(d, 10)))
-    .replace(/&([a-z]+);/gi, (m, name) => ENTITIES[name.toLowerCase()] ?? m);
-}
-function safeFromCode(code) {
-  try { return String.fromCodePoint(code); } catch { return ""; }
-}
 
 const JUNK_EMAIL = /\.(png|jpe?g|gif|svg|webp|css|js|woff2?)$|example\.com|sentry\.|wixpress\.com|@2x|@3x|no-?reply@|noreply@|placeholder|notifyboost|back-?in-?stock@|pre-?order@|wishlist|appspot|schema\.org|@domain|your@|you@|test@|sentry\.io/i;
 
@@ -52,28 +38,18 @@ export function domainOf(url) {
 
 export const emailDomain = (v) => (String(v).split("@")[1] || "").toLowerCase();
 
-export async function fetchHtml(url, { timeout = 8000, maxBytes = 1500000, useChrome = false, proxy = "" } = {}) {
-  try {
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), timeout);
-    const res = await proxiedFetch({ proxy }, url, { signal: ctrl.signal, redirect: "follow", headers: { "User-Agent": UA, "Accept": "text/html,application/xhtml+xml" } }, timeout);
-    const text = await res.text();
-    clearTimeout(t);
-    if (!res.ok || !text || text.length <= 300) throw new Error(`empty(${text ? text.length : 0})`);
-    return text.length > maxBytes ? text.slice(0, maxBytes) : text;
-  } catch {
-    if (!useChrome) return "";
-    try {
-      const { stdout } = await execFileP(CHROME, ["--headless=new", "--disable-gpu", "--hide-scrollbars", "--virtual-time-budget=8000", "--dump-dom", url], { maxBuffer: 30 * 1024 * 1024, timeout: 30000 });
-      if (stdout && stdout.length > 300) return stdout.length > maxBytes ? stdout.slice(0, maxBytes) : stdout;
-    } catch { /* 忽略 */ }
-    return "";
-  }
+export async function fetchHtml(url, { timeout=8000,maxBytes=1500000,proxy='',signal,allowLocal=false }={}) {
+  const res=await proxiedFetch({proxy},url,{signal,maxBytes,publicOnly:!allowLocal,headers:{'User-Agent':UA,Accept:'text/html,application/xhtml+xml'}},timeout);
+  if(!res.ok)throw Error(`页面 HTTP ${res.status}`);
+  const type=res.headers.get('content-type')||'';if(type&&!/html|text|xml/i.test(type))throw Error('页面不是文本');
+  const text=await res.text();if(text.length<80)throw Error('页面内容不足');
+  if(/<title[^>]*>\s*(just a moment|access denied|attention required|verify)/i.test(text))throw Error('页面要求浏览器验证');
+  return text;
 }
 
 function cleanText(html) {
-  return decodeEntities(html.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim());
+  return html.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
 }
 
 function uniq(arr) { return [...new Set(arr.map((x) => String(x).trim()).filter(Boolean))]; }
@@ -92,30 +68,24 @@ export function extractEmails(html, pageUrl) {
 
 function countDigits(s) { return (s.match(/\d/g) || []).length; }
 
-/** "+662-117-1300 09" 这种是「电话 + 营业时间」粘在一起，尾部时间片要切掉 */
-function stripTrailingTime(v) {
-  const m = v.match(/^(.*?)\s+(\d{1,2})(?::\d{2})?$/);
-  if (m && countDigits(m[1]) >= 8) return m[1].trim();
-  return v;
-}
-
 export function extractPhones(html, pageUrl) {
-  const raw = [];
-  for (const m of html.matchAll(/<a[^>]+href=["'](tel:[^"']+)["'][^>]*>/gi)) raw.push(m[1].replace(/^tel:/i, "").trim());
-  const text = cleanText(html);
-  for (const m of text.matchAll(/(?:\+\d[\d\s().\-]{6,15})/g)) raw.push(m[0].replace(/\s+/g, " ").trim());
-
-  // 按「纯数字」去重：同一个号可能同时以 +6621171300 / +662-117-1300 / +662-117-1300 09 出现
-  const byDigits = new Map();
-  for (const v0 of raw) {
-    const v = stripTrailingTime(v0);
-    const d = (v.match(/\d/g) || []).join("");
-    if (d.length < 7 || d.length > 15) continue;
-    const prev = byDigits.get(d);
-    // 同号保留写法更干净的那个（非数字字符更少）
-    if (!prev || (v.match(/[^\d]/g) || []).length < (prev.match(/[^\d]/g) || []).length) byDigits.set(d, v);
+  const out = [];
+  const seen = new Set();
+  for (const m of html.matchAll(/<a[^>]+href=["'](tel:[^"']+)["'][^>]*>/gi)) {
+    const v = m[1].replace(/^tel:/i, "").trim();
+    if (seen.has(v)) continue;
+    seen.add(v);
+    out.push({ value: v, source: pageUrl, confidence: "official" });
   }
-  return [...byDigits.values()].slice(0, 12).map((value) => ({ value, source: pageUrl, confidence: "official" }));
+  const text = cleanText(html);
+  for (const m of text.matchAll(/(?:\+\d[\d\s().\-]{6,15})/g)) {
+    const v = m[0].replace(/\s+/g, " ").trim();
+    const d = countDigits(v);
+    if (d < 7 || d > 15 || seen.has(v)) continue;
+    seen.add(v);
+    out.push({ value: v, source: pageUrl, confidence: "official" });
+  }
+  return out.slice(0, 12);
 }
 
 const NOISE = new Set(["tr", "share", "sharer", "plugins", "plugin", "dialog", "login", "logout", "watch", "pages", "groups", "profile", "explore", "accounts", "reel", "intent", "home", "widgets", "search", "hashtag", "media", "static", "pslogin", "license", "en", "th", "t", "php", "id", "post", "sdk", "reels", "video"]);
@@ -181,7 +151,7 @@ export function detectSignals(html) {
 
 export function extractTitle(html) {
   const m = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
-  return m ? decodeEntities(m[1]).replace(/\s+/g, " ").trim() : "";
+  return m ? m[1].replace(/\s+/g, " ").trim() : "";
 }
 
 export function extractAll(html, pageUrl) {
@@ -195,95 +165,34 @@ export function extractAll(html, pageUrl) {
   };
 }
 
-async function hunter(cfg, domain) {
-  const h = cfg.contacts.email_finder.hunter;
-  const url = `${h.endpoint}?domain=${encodeURIComponent(domain)}&api_key=${encodeURIComponent(h.apiKey)}`;
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), cfg.search.timeout_ms);
-  const res = await fetch(url, { signal: ctrl.signal });
-  const data = await res.json();
-  clearTimeout(t);
-  return (data.data?.emails || []).map((e) => ({ value: e.value, source: "hunter", confidence: "candidate", type: e.type || "" }));
+export async function emailFinder(cfg,domain,signal){
+ if(!emailFinderReady(cfg))return [];
+ const h=cfg.contacts.email_finder.hunter;const url=new URL(h.endpoint);url.searchParams.set('domain',domain);url.searchParams.set('api_key',h.apiKey);
+ const res=await proxiedFetch(cfg,url,{signal},cfg.search.timeout_ms);if(!res.ok)throw Error(`Hunter HTTP ${res.status}`);const j=await res.json();
+ return (j.data?.emails||[]).filter(x=>x.value).map(x=>({value:x.value,source:'https://hunter.io',confidence:'candidate',verification:x.verification?.status||'unknown',type:x.type||''}));
+}
+export function contactUrls(html,base){
+ const origin=new URL(base).origin;const links=[];
+ for(const m of html.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)){
+  try{const u=safeUrl(new URL(m[1].replace(/&amp;/g,'&'),base));if(u.origin===origin&&/contact|about|wholesale|문의|ติดต่อ|联系我们|联络/i.test(u.pathname+' '+cleanText(m[2])))links.push(u.href.split('#')[0]);}catch{}
+ }
+ return uniq([...links,...['/contact','/pages/contact','/about','/wholesale'].map(x=>new URL(x,origin).href)]);
+}
+export async function enrichSite(cfg,baseUrl,{signal,fetcher=fetchHtml}={}){
+ const acc={emails:[],phones:[],social:[],signals:[],title:'',text:'',pages:[],errors:[],fetch_status:'failed',website:baseUrl};
+ const origin=safeUrl(baseUrl).origin;let queue=uniq([baseUrl,origin+'/']);const seen=new Set();const maxPages=cfg.contacts.max_pages||4;
+ while(queue.length&&seen.size<maxPages){
+  signal?.throwIfAborted();const u=queue.shift();if(seen.has(u))continue;seen.add(u);
+  try{
+   const html=await fetcher(u,{timeout:cfg.contacts.page_timeout_ms,maxBytes:cfg.contacts.max_html_bytes,proxy:resolveProxy(cfg),signal,allowLocal:cfg.__allowLocalTests});
+   const e=extractAll(html,u);const at=new Date().toISOString();acc.pages.push({url:u,text:cleanText(html).slice(0,12000),fetched_at:at});
+   for(const k of ['emails','phones','social','signals'])acc[k].push(...e[k]);if(!acc.title)acc.title=e.title;
+   acc.text=acc.pages.map(x=>x.text).join('\n').slice(0,18000);queue=uniq([...contactUrls(html,u),...queue]).filter(x=>!seen.has(x));
+  }catch(e){if(signal?.aborted)throw e;acc.errors.push({url:u,error:redactError(e)});}
+ }
+ for(const k of ['emails','phones'])acc[k]=[...new Map(acc[k].map(x=>[x.value.toLowerCase(),{...x,confidence:'published',observed_at:new Date().toISOString()}])).values()];
+ acc.social=[...new Map(acc.social.map(x=>[x.platform+':'+x.handle.toLowerCase(),x])).values()];acc.signals=uniq(acc.signals);
+ if(acc.pages.length){acc.fetch_status='ok';if(!acc.emails.length&&emailFinderReady(cfg)){try{acc.emails.push(...await emailFinder(cfg,domainOf(baseUrl),signal));}catch(e){acc.errors.push({url:baseUrl,error:redactError(e)});}}}
+ return acc;
 }
 
-async function snov(cfg, domain) {
-  const s = cfg.contacts.email_finder.snov;
-  const url = `${s.endpoint}?domain=${encodeURIComponent(domain)}&userId=${encodeURIComponent(s.userId)}&secret=${encodeURIComponent(s.secret)}`;
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), cfg.search.timeout_ms);
-  const res = await fetch(url, { signal: ctrl.signal });
-  const data = await res.json();
-  clearTimeout(t);
-  return Object.values(data.emails || {}).map((e) => ({ value: e.email, source: "snov", confidence: "candidate", type: e.type || "" }));
-}
-
-async function apollo(cfg, domain) {
-  const a = cfg.contacts.email_finder.apollo;
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), cfg.search.timeout_ms);
-  const res = await fetch(a.endpoint, {
-    method: "POST",
-    signal: ctrl.signal,
-    headers: { "Content-Type": "application/json", "X-Api-Key": a.apiKey },
-    body: JSON.stringify({ q_organization_domains: domain, page: 1, per_page: 10 }),
-  });
-  const data = await res.json();
-  clearTimeout(t);
-  return (data.people || []).map((p) => ({ value: p.email, source: "apollo", confidence: "candidate", name: p.name, title: p.title })).filter((e) => e.value);
-}
-
-export async function emailFinder(cfg, domain) {
-  const p = cfg.contacts.email_finder.provider;
-  if (!domain) return [];
-  try {
-    if (p === "hunter") return await hunter(cfg, domain);
-    if (p === "snov") return await snov(cfg, domain);
-    if (p === "apollo") return await apollo(cfg, domain);
-  } catch (e) {
-    return [{ value: "", source: p, confidence: "candidate", error: String(e.message || e).slice(0, 100) }];
-  }
-  return [];
-}
-
-export async function enrichSite(cfg, baseUrl) {
-  const host = domainOf(baseUrl);
-  const acc = { emails: [], phones: [], social: [], signals: [], title: "", text: "" };
-  const seen = new Set();
-  const pages = cfg.contacts.pages_to_try || [""];
-  const pageTimeout = cfg.contacts.page_timeout_ms ?? 8000;
-  const maxBytes = cfg.contacts.max_html_bytes ?? 1500000;
-  const useChrome = !!cfg.contacts.use_chrome_fallback;
-  for (const p of pages) {
-    if (acc.emails.length && acc.phones.length && acc.social.length) break;
-    let u;
-    try {
-      u = p ? new URL((p.startsWith("http") ? p : `${baseUrl.replace(/\/+$/, "")}/${p}`)).toString() : baseUrl;
-    } catch { continue; }
-    if (seen.has(u)) continue;
-    seen.add(u);
-    const html = await fetchHtml(u, { timeout: pageTimeout, maxBytes, useChrome, proxy: resolveProxy(cfg) });
-    if (!html) continue;
-    const e = extractAll(html, u);
-    for (const k of ["emails", "phones", "social"]) acc[k].push(...e[k]);
-    acc.signals.push(...e.signals);
-    if (!acc.title) acc.title = e.title;
-    if (!acc.text) acc.text = e.text;
-  }
-  const rawEmails = uniq(acc.emails.map((e) => e.value)).map((v) => ({ value: v, source: host, confidence: "official" }));
-  const sameDomain = rawEmails.filter((e) => emailDomain(e.value) === host);
-  acc.emails = sameDomain.length ? sameDomain : rawEmails;
-  acc.phones = uniq(acc.phones.map((e) => e.value)).map((v) => ({ value: v, source: host, confidence: "official" }));
-  acc.social = [...new Map(acc.social.map((s) => [`${s.platform}:${s.handle}`, s])).values()];
-  acc.signals = uniq(acc.signals);
-
-  let found = acc.emails;
-  const ef = await emailFinder(cfg, host);
-  if (Array.isArray(ef)) {
-    for (const item of ef) {
-      if (!item || !item.value) continue;
-      if (!acc.emails.some((e) => e.value.toLowerCase() === item.value.toLowerCase())) found.push(item);
-    }
-  }
-  acc.emails = found;
-  return acc;
-}

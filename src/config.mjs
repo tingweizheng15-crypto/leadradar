@@ -1,94 +1,41 @@
-import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-// 打包成 EXE 后，程序文件在只读的安装目录，可写数据（.env / out / state）由启动器通过 LR_ROOT 指定
-export const ROOT = process.env.LR_ROOT ? path.resolve(process.env.LR_ROOT) : path.resolve(__dirname, "..");
-
-export function loadEnvFile() {
-  const p = path.join(ROOT, ".env");
-  const env = {};
-  if (!fs.existsSync(p)) return env;
-  for (const line of fs.readFileSync(p, "utf8").split(/\r?\n/)) {
-    const t = line.trim();
-    if (!t || t.startsWith("#")) continue;
-    const i = t.indexOf("=");
-    if (i === -1) continue;
-    const k = t.slice(0, i).trim();
-    let v = t.slice(i + 1).trim();
-    if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1);
-    env[k] = v;
-  }
-  return env;
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import {searchTerms} from './search-terms.mjs';
+import {validateLocalization} from './localization.mjs';
+export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+export const DATA_DIR = process.env.LEADRADAR_DATA_DIR || path.join(ROOT, 'runtime-data');
+export function loadEnvFile(file = path.join(DATA_DIR, '.env')) {
+  if (!fs.existsSync(file)) return {};
+  return Object.fromEntries(fs.readFileSync(file,'utf8').split(/\r?\n/).flatMap(line=>{
+    const m=line.match(/^\s*([A-Za-z_][\w]*)\s*=\s*(.*?)\s*$/); if(!m)return [];
+    let v=m[2]; if(/^['"]/.test(v))v=v.slice(1,v.lastIndexOf(v[0]));else v=v.replace(/\s+#.*$/,'').trim();
+    return [[m[1],v]];
+  }));
 }
-
-export function loadConfig() {
-  const fileEnv = loadEnvFile();
-  const env = { ...fileEnv, ...process.env };
-  const cfgPath = path.join(ROOT, "config.json");
-  const exPath = path.join(ROOT, "config.example.json");
-  const src = fs.existsSync(cfgPath) ? cfgPath : exPath;
-  const cfg = JSON.parse(fs.readFileSync(src, "utf8"));
-
-  // 代理优先级：config.json 的 proxy > .env 的 HTTPS_PROXY > 系统环境变量。
-  // 之前 .env 里的 HTTPS_PROXY 谁都不读，用户照着文档填了却不生效。
-  const proxy = fileEnv.HTTPS_PROXY || env.HTTPS_PROXY || fileEnv.HTTP_PROXY || env.HTTP_PROXY || "";
-  if (!cfg.proxy && proxy) cfg.proxy = proxy;
-
-  // CHROME_PATH 同理：写进 .env 也要能用（findChrome 读的是 process.env）
-  const chromePath = fileEnv.CHROME_PATH || env.CHROME_PATH || "";
-  if (chromePath && !process.env.CHROME_PATH) process.env.CHROME_PATH = chromePath;
-
-  const s = cfg.search || (cfg.search = {});
-  // 换搜索源不用改 config.json：操作台/`.env` 里写 SEARCH_PROVIDER=bing / google_cse 即可
-  if (env.SEARCH_PROVIDER) s.provider = env.SEARCH_PROVIDER;
-  const serper = s.serper || (s.serper = {});
-  const bing = s.bing || (s.bing = {});
-  const g = s.google_cse || (s.google_cse = {});
-  if (env.SERPER_API_KEY) serper.apiKey = env.SERPER_API_KEY;
-  if (env.BING_API_KEY) bing.apiKey = env.BING_API_KEY;
-  if (env.GOOGLE_CSE_KEY) g.apiKey = env.GOOGLE_CSE_KEY;
-  if (env.GOOGLE_CSE_CX) g.cx = env.GOOGLE_CSE_CX;
-
-  const ef = cfg.contacts?.email_finder || (cfg.contacts.email_finder = {});
-  const hunter = ef.hunter || (ef.hunter = {});
-  const apollo = ef.apollo || (ef.apollo = {});
-  const snov = ef.snov || (ef.snov = {});
-  if (env.HUNTER_API_KEY) hunter.apiKey = env.HUNTER_API_KEY;
-  if (env.APOLLO_API_KEY) apollo.apiKey = env.APOLLO_API_KEY;
-  if (env.SNOV_USER_ID) snov.userId = env.SNOV_USER_ID;
-  if (env.SNOV_SECRET) snov.secret = env.SNOV_SECRET;
-
-  const llm = cfg.llm || (cfg.llm = {});
-  if (env.LLM_API_KEY) llm.api_key = env.LLM_API_KEY;
-  if (env.LLM_BASE_URL) llm.base_url = env.LLM_BASE_URL;
-  if (env.LLM_MODEL) llm.model = env.LLM_MODEL;
-  // 思考型模型（deepseek-reasoner / deepseek-flash / o1 等）的思考 token 也吃 max_tokens，
-  // 1500 常常在思考阶段就见底，导致正文为空。默认给足，可用 LLM_MAX_TOKENS 覆盖。
-  const mt = Number(env.LLM_MAX_TOKENS || llm.max_tokens || 0);
-  llm.max_tokens = Number.isFinite(mt) && mt > 0 ? Math.min(32000, Math.round(mt)) : 4000;
-  if (env.LLM_JSON_MODE) llm.json_mode = !/^(0|false|no|off)$/i.test(String(env.LLM_JSON_MODE).trim());
-
-  return cfg;
+export function merge(a,b){const out=structuredClone(a);for(const [k,v] of Object.entries(b||{})){if(['__proto__','constructor','prototype'].includes(k))continue;out[k]=v&&typeof v==='object'&&!Array.isArray(v)?merge(out[k]||{},v):v;}return out;}
+export function validateConfig(cfg){
+  const terms=searchTerms(cfg);cfg.search.custom_keywords=terms;
+  if(!Array.isArray(cfg.markets)||!cfg.markets.length)throw Error('请至少选择一个市场');
+  if(!Array.isArray(cfg.products)||!cfg.products.length&&!terms.length)throw Error('请填写自定义搜索词，或至少选择一个预设产品');
+  for(const [v,min,max,label] of [[cfg.search.max_queries_per_run,1,120,'搜索次数'],[cfg.search.results_per_query,1,10,'每次结果数'],[cfg.report.max_candidates_per_run,1,100,'候选上限'],[cfg.contacts.page_timeout_ms,1000,60000,'页面超时']])if(!Number.isInteger(v)||v<min||v>max)throw Error(`${label}应为 ${min}–${max} 的整数`);
+  if(!/^([01]\d|2[0-3]):[0-5]\d:[0-5]\d$/.test(cfg.schedule.daily))throw Error('定时时间格式应为 HH:MM:SS');
+  new Intl.DateTimeFormat('en',{timeZone:cfg.schedule.timezone});
+  if(!['serper','google_cse'].includes(cfg.search.provider))throw Error('请选择 Serper 或已有账号的 Google CSE；Bing 旧接口已退役');
+  if(!['none','hunter'].includes(cfg.contacts.email_finder.provider))throw Error('当前版本支持已适配的 Hunter；旧 Apollo/Snov 适配已停用');
+  if(cfg.proxy&&!/^https?:\/\//.test(cfg.proxy))throw Error('代理须为 http:// 或 https:// 地址');
+  return validateLocalization(cfg);
 }
-
-export function llmReady(cfg) {
-  return !!(cfg.llm?.api_key && cfg.llm?.model);
+export function loadConfig(){
+  const defaults=JSON.parse(fs.readFileSync(path.join(ROOT,'config.example.json'),'utf8'));
+  const file=fs.existsSync(path.join(DATA_DIR,'config.json'))?path.join(DATA_DIR,'config.json'):path.join(ROOT,'config.json');
+  const cfg=merge(defaults,fs.existsSync(file)?JSON.parse(fs.readFileSync(file,'utf8')):{});
+  const env={...loadEnvFile(path.join(ROOT,'.env')),...loadEnvFile(),...process.env};
+  const mappings=[['SERPER_API_KEY',cfg.search.serper,'apiKey'],['GOOGLE_CSE_KEY',cfg.search.google_cse,'apiKey'],['GOOGLE_CSE_CX',cfg.search.google_cse,'cx'],['LLM_API_KEY',cfg.llm,'api_key'],['LLM_BASE_URL',cfg.llm,'base_url'],['LLM_MODEL',cfg.llm,'model'],['HUNTER_API_KEY',cfg.contacts.email_finder.hunter,'apiKey']];
+  for(const [k,o,key] of mappings)if(env[k])o[key]=env[k];
+  cfg.proxy=cfg.proxy||env.HTTPS_PROXY||env.HTTP_PROXY||''; cfg.chrome_path=cfg.chrome_path||env.CHROME_PATH||'';
+  cfg.data_dir=DATA_DIR; return validateConfig(cfg);
 }
-
-export function searchReady(cfg) {
-  const p = cfg.search.provider;
-  if (p === "serper") return !!cfg.search.serper?.apiKey;
-  if (p === "bing") return !!cfg.search.bing?.apiKey;
-  if (p === "google_cse") return !!(cfg.search.google_cse?.apiKey && cfg.search.google_cse?.cx);
-  return false;
-}
-
-export function emailFinderReady(cfg) {
-  const p = cfg.contacts.email_finder.provider;
-  if (p === "hunter") return !!cfg.contacts.email_finder.hunter?.apiKey;
-  if (p === "apollo") return !!cfg.contacts.email_finder.apollo?.apiKey;
-  if (p === "snov") return !!(cfg.contacts.email_finder.snov?.userId && cfg.contacts.email_finder.snov?.secret);
-  return false;
-}
+export const llmReady=cfg=>Boolean(cfg.llm?.api_key&&cfg.llm?.model);
+export const searchReady=cfg=>cfg.search.provider==='serper'?Boolean(cfg.search.serper?.apiKey):cfg.search.provider==='google_cse'?Boolean(cfg.search.google_cse?.apiKey&&cfg.search.google_cse?.cx):false;
+export const emailFinderReady=cfg=>cfg.contacts.email_finder.provider==='hunter'&&Boolean(cfg.contacts.email_finder.hunter?.apiKey);

@@ -13,11 +13,12 @@ import { promisify } from "node:util";
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
-import { ROOT } from "../src/config.mjs";
-import { findChrome } from "../src/enrich.mjs";
+import {fileURLToPath} from 'node:url';
+import {stableContent, freshness as checkedFreshness} from '../src/monitor.mjs';
 
 const execFileP = promisify(execFile);
-const CHROME = findChrome();
+const CHROME = process.env.CHROME_PATH || "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DAILY = path.join(ROOT, "daily");
 const STATE_DIR = path.join(DAILY, "state");
 const OUT_ROOT = path.join(DAILY, "out");
@@ -32,6 +33,7 @@ const argDate = (() => {
   const i = process.argv.indexOf("--date");
   return i > -1 ? process.argv[i + 1] : ymd();
 })();
+if(argDate!==ymd())throw Error('只能采集今天的页面；不能用历史日期标记当前内容。');
 
 const cfg = JSON.parse(fs.readFileSync(path.join(DAILY, "sources.json"), "utf8"));
 const ledgerPath = path.join(STATE_DIR, "ledger.json");
@@ -45,12 +47,6 @@ const shotDir = path.join(outDir, "screenshots");
 fs.mkdirSync(shotDir, { recursive: true });
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-if (!CHROME) {
-  console.error("未找到 Chrome / Chromium：每日采集依赖无头浏览器渲染与截图。");
-  console.error("装一个 Chrome，或设置环境变量 CHROME_PATH 指向可执行文件后重试。");
-  process.exit(1);
-}
 
 function urlOf(s) {
   if (s.channel === "instagram") return `https://www.instagram.com/${s.handle}/embed/`;
@@ -134,9 +130,7 @@ function extract(html, s) {
   if (/made in|factory|공장|โรงงาน/i.test(text)) sig.push("产地/工厂表述");
 
   // 动态计数（粉丝数、点赞数、浏览数）每次都变，先剔除再哈希，避免「每天都算变化」
-  const stable = text.toLowerCase()
-    .replace(/[\d][\d.,]*\s*(?:k|m|万|亿)?/g, "n")
-    .replace(/\s+/g, " ");
+  const stable = stableContent(text);
   const hash = crypto.createHash("sha256").update(stable).digest("hex").slice(0, 16);
   const postNum = parseCount(posts);
   const tokens = tokensOf(stable);
@@ -221,7 +215,7 @@ for (const s of cfg.watchlist) {
 
     const prev = ledger[s.id];
     const isNew = !prev;
-    const postsChanged = !!(prev && e.postNum != null && prev.last_posts != null && e.postNum !== prev.last_posts);
+    const postsChanged = !!(prev && e.postNum != null && prev.last_posts != null && e.postNum > prev.last_posts);
     rec.postsChanged = postsChanged;
     rec.postDiff = postsChanged ? `${prev.last_posts} → ${e.postNum}` : "";
     const sim = prev?.last_tokens ? jaccard(prev.last_tokens, e.tokens) : 1;
@@ -248,12 +242,13 @@ for (const s of cfg.watchlist) {
       rec.changeNote = contentChanged ? `内容相似度 ${rec.similarity}` : "内容基本一致";
     }
 
-    const changed = !!prev && (contentChanged || (s.type !== "hashtag" && postsChanged));
+    const publicationChanged = !!prev && e.pub && e.pub !== prev.last_pub && Date.parse(e.pub) <= Date.now() && Date.now()-Date.parse(e.pub)<72*36e5;
+    const changed = !!prev && !e.missing && (contentChanged || publicationChanged || (s.type !== "hashtag" && postsChanged));
     rec.change = isNew ? "new" : changed ? "changed" : "unchanged";
     rec.policy = policy;
     rec.first_seen = prev?.first_seen || argDate;
 
-    const f = freshness(e.pub, changed, isNew);
+    const f = checkedFreshness(e.pub, changed, isNew);
     rec.tier = f.tier; rec.tierLabel = f.label; rec.basis = f.basis; rec.pubHours = f.hours;
 
     const file = path.join(shotDir, `${s.channel}-${s.id}.png`);
@@ -266,10 +261,11 @@ for (const s of cfg.watchlist) {
       rec.shotError = String(e.message || e).slice(0, 120);
     }
 
-    ledger[s.id] = {
+    if(!e.missing) ledger[s.id] = {
       first_seen: rec.first_seen,
       last_hash: e.hash,
-      last_posts: e.postNum,
+      last_posts: e.postNum ?? prev?.last_posts ?? null,
+      last_pub: e.pub || prev?.last_pub || '',
       last_tokens: e.tokens,
       last_changed: changed || isNew ? argDate : prev?.last_changed || argDate,
       last_seen: argDate,

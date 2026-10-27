@@ -1,0 +1,4 @@
+import fs from 'node:fs';import path from 'node:path';
+import {loadConfig} from '../src/config.mjs';import {runPipeline} from '../src/pipeline.mjs';import {closeConnections} from '../src/net.mjs';
+const cfg=loadConfig();cfg.search.serper.apiKey='';cfg.search.provider='serper';cfg.llm.api_key='';cfg.contacts.email_finder.provider='none';cfg.markets=['TH','KR'];cfg.report.max_candidates_per_run=4;cfg.contacts.max_pages=3;cfg.contacts.page_timeout_ms=8000;cfg.proxy='';
+try{const r=await runPipeline(cfg,{onProgress:s=>console.log(s)});console.log(JSON.stringify({stats:r.stats,warnings:r.warnings,reportPath:r.reportPath},null,2));fs.writeFileSync(path.join(cfg.data_dir,'live-run-summary.json'),JSON.stringify({stats:r.stats,warnings:r.warnings,reportPath:r.reportPath},null,2));}finally{closeConnections();}

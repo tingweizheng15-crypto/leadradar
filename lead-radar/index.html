@@ -246,7 +246,7 @@
       <b>我方产品</b><br>
       跑步压缩裤 / 跑步背心 / 紧身运动裤<br><br>
       <b>当前样本库</b><br>
-      <span id="sampleCount">—</span> 家 · 6 国 · 公开信息核验<br><br>
+      32 家 · 6 国 · 公开信息核验<br><br>
       <span style="color:#b45309">演示模式：采集过程为规则引擎模拟，非实时爬取。</span>
     </div>
   </aside>
@@ -532,40 +532,26 @@ const state = {
 const $ = (s)=>document.querySelector(s);
 const esc = (s)=>String(s==null?"":s).replace(/[&<>"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 
-/* 七维评分：与 src/score.mjs 完全对齐（25/20/10/12/10/13/10 = 100）
-   之前这里是一套 30/20/10/15/15/10 的六维旧模型，和流水线报告不同源，已统一。 */
-const OEM_KEY = /private label|white label|custom logo|oem|odm|贴牌|代工|定制|customiz|personaliz|bespoke|your brand|made to order|주문제작|맞춤|รับผลิต|สั่งทำ/i;
-
-function oemOf(c){
-  const hay = [c.note || "", ...(c.signals || []).map(s => s.t)].join(" ");
-  if (OEM_KEY.test(hay)) return 13;
-  if (["brand", "distributor", "event", "platform"].includes(c.type)) return 8;
-  return 2;
-}
-
 function scoreOf(c){
   const overlap = c.products.filter(p=>state.products.includes(p));
   const ratio = state.products.length ? overlap.length/state.products.length : 0;
-
-  // 命中 1 个核心 SKU 15 / 2 个 20 / 3 个以上 25
-  const productScore = overlap.length === 0 ? 0 : overlap.length === 1 ? 15 : overlap.length === 2 ? 20 : 25;
+  const productScore = Math.round(30*ratio);
 
   const roleScore = TYPES[c.type].role;
   const geoScore = state.markets.includes(c.country) ? 10 : 0;
 
-  // 商业就绪度 12：官网 3 / 社媒 3 / B2B 入口 3 / 基础分 3
-  let read = 3;
-  if(c.website) read += 3;
-  if(c.social) read += 3;
-  if(c.b2b) read += 3;
-  read = Math.min(12, read);
+  let read = 0;
+  if(c.website) read += 4;
+  if(c.social) read += 2;
+  if(c.b2b) read += 4;
+  read += c.scale==="L" ? 4 : c.scale==="M" ? 2 : 1;
+  read = Math.min(15, read);
 
-  const act = Math.min(10, 2 + c.signals.length*2);
-  const oem = oemOf(c);
+  const act = Math.min(15, 3 + c.signals.length*2.2);
   const ev = c.evidence==="official" ? 10 : c.evidence==="news" ? 8 : c.evidence==="directory" ? 6 : 5;
 
-  const total = Math.min(100, Math.round(productScore + roleScore + geoScore + read + act + oem + ev));
-  return { overlap, ratio, productScore, roleScore, geoScore, read:Math.round(read), act:Math.round(act), oem, ev, total };
+  const total = Math.min(100, Math.round(productScore + roleScore + geoScore + read + act + ev));
+  return { overlap, ratio, productScore, roleScore, geoScore, read:Math.round(read), act:Math.round(act), ev, total };
 }
 
 function statusOf(score){ return score>=80 ? "qualified" : score>=60 ? "review" : "rejected"; }
@@ -607,7 +593,7 @@ const STEPS = [
   { k:"dedupe", label:"域名去重",     detail:"规范化官网域名，合并同名实体" },
   { k:"exclude",label:"硬排除",       detail:"消费者页面 / 无实体 / 竞品制造商" },
   { k:"intent", label:"需求识别",     detail:"提取在售品类与近期活动信号" },
-  { k:"score",  label:"规则评分",     detail:"7 维度加权，按合格线分层" }
+  { k:"score",  label:"规则评分",     detail:"6 维度加权，按合格线分层" }
 ];
 
 async function run(){
@@ -885,12 +871,11 @@ function openDrawer(id){
   const r = state.results.find(x=>x.id===id);
   if(!r) return;
   const brk = [
-    ["产品需求匹配", r.productScore, 25],
+    ["产品需求匹配", r.productScore, 30],
     ["买家角色", r.roleScore, 20],
     ["地区", r.geoScore, 10],
-    ["商业就绪度", r.read, 12],
-    ["近期活动", r.act, 10],
-    ["定制/OEM 需求", r.oem, 13],
+    ["商业就绪度", r.read, 15],
+    ["近期活动", r.act, 15],
     ["证据强度", r.ev, 10]
   ];
 
@@ -1012,7 +997,6 @@ document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeDrawer(); })
 
 renderControls();
 renderKpis();
-$("#sampleCount").textContent = DATA.length;
 $("#kpis").innerHTML = ["客户总数","合格客户","高意向","待复核","平均匹配度","需求覆盖率"]
   .map(k=>`<div class="kpi"><div class="k">${k}</div><div class="v">–</div><div class="d">待采集</div></div>`).join("");
 $("#tableWrap").innerHTML = `<div class="empty"><div class="ic">◎</div><b>还没有采集结果</b>

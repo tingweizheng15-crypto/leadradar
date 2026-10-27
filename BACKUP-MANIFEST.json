@@ -1,0 +1,265 @@
+{
+  "version": "3.2.0",
+  "created_at": "2026-10-27T12:52:17.568Z",
+  "source_files": [
+    {
+      "path": ".env.example",
+      "bytes": 663,
+      "sha256": "1f648421936efcc99a9e805eeb32216705d61099192cd68665b48699bfb65287"
+    },
+    {
+      "path": ".gitignore",
+      "bytes": 440,
+      "sha256": "dd3439c72143c55c41d739b9e182dc8d0f1fc86720ec3e1400e391cb416d84df"
+    },
+    {
+      "path": "app/app.css",
+      "bytes": 6536,
+      "sha256": "9bfbd79b898033ce378ad6b047e65a86959223c6f803ccd3a054bde119be63bf"
+    },
+    {
+      "path": "app/app.js",
+      "bytes": 14988,
+      "sha256": "ccb9a3fd6cdb73894e2e91594c829116735f2f9c3d729bcd7b254992e17b4247"
+    },
+    {
+      "path": "app/index.html",
+      "bytes": 6523,
+      "sha256": "1ebf98ea8f6ee796dc2506bb1e31995e6bdcf76cf05b13fff991420ff98a9acb"
+    },
+    {
+      "path": "BACKUP.md",
+      "bytes": 887,
+      "sha256": "0111d2a9682f19769c717d854b027e20f531eedc8428c06ddb0b0be1ae93accf"
+    },
+    {
+      "path": "config.example.json",
+      "bytes": 4133,
+      "sha256": "74dd23d2017a3790baab8251999f4f9c5a1a3c8c6b6443a4f46dc8ee773b9a62"
+    },
+    {
+      "path": "daily/run.mjs",
+      "bytes": 22135,
+      "sha256": "6f56e423f37851368496643838749895870d7a8bb41b208ed26a6e7c823fa6ce"
+    },
+    {
+      "path": "daily/sources.json",
+      "bytes": 2625,
+      "sha256": "635287ff950652b5ba2f45fb41d0860e1e9f8cd0e73ade097b828917f68a2bf5"
+    },
+    {
+      "path": "desktop/build.ps1",
+      "bytes": 2345,
+      "sha256": "a8934ec35635c0599d72be1b68189d8ded78371061187c10a14945870ecdb54d"
+    },
+    {
+      "path": "desktop/Launcher.cs",
+      "bytes": 6076,
+      "sha256": "d5815a2959872effc2763097d31b4f144ceb5c737cd7a7caaf57cfd2982d9bf9"
+    },
+    {
+      "path": "desktop/LauncherV2.cs",
+      "bytes": 12108,
+      "sha256": "94ed98eb38ef22ae54e697ef6bd2b785dc3d0b05375fbe3559eed030f50b8075"
+    },
+    {
+      "path": "docs/multilingual-3.2.0.md",
+      "bytes": 3455,
+      "sha256": "e2ebb5b069276a02a517cf8da15de7e51c8dd0c02c36b38a56cac7b98b9892e0"
+    },
+    {
+      "path": "docs/README-original.md",
+      "bytes": 13665,
+      "sha256": "ef35973aabb3d605518e0b85925d636fc0997fbca66630f33b2a1e016488906e"
+    },
+    {
+      "path": "docs/screenshots/daily-report.png",
+      "bytes": 594665,
+      "sha256": "8875399f5dcfe407fd4cfb4237e40c452655916d9b8471bc6389365dd705ca9e"
+    },
+    {
+      "path": "docs/screenshots/dashboard.png",
+      "bytes": 244163,
+      "sha256": "172552598555fdff7c32d565fa50a96928ac4152b3e6df1141167411b186dbd9"
+    },
+    {
+      "path": "docs/screenshots/sourcing.png",
+      "bytes": 252266,
+      "sha256": "01114f8dc3c43663d21b6fbe013b4875a8cc30f8015bb6d2ad122cf703355123"
+    },
+    {
+      "path": "docs/配置与部署指南.md",
+      "bytes": 5319,
+      "sha256": "74ac09fbf36b8274b4775150348d73a20e4831e23758b042d39f92daa0676c9c"
+    },
+    {
+      "path": "exports/runner-apparel-20261026.html",
+      "bytes": 25684,
+      "sha256": "384be89d6e59a203f7cde6e5a5eab4134ff808c7f9436ab12c8787a101042f56"
+    },
+    {
+      "path": "exports/runner-apparel-20261026.md",
+      "bytes": 17734,
+      "sha256": "8d2de78d63f7e9a72ea081899c84299ee34146bce3a6f6c2e26a6e9aa4241690"
+    },
+    {
+      "path": "lead-radar/index.html",
+      "bytes": 56955,
+      "sha256": "dc41ad5725624e3e7abfe9d2a769ea650eaa305a654e593e9511f73589dbeb37"
+    },
+    {
+      "path": "lead-radar/social-sourcing.html",
+      "bytes": 38323,
+      "sha256": "96ed0fb91f3635dc81fecb43e28f5ce999c42e3b989c537d726e69cb843d126c"
+    },
+    {
+      "path": "LICENSE",
+      "bytes": 1066,
+      "sha256": "a49b351e769ab79c890666c9eac701bf58065fcba88f41dd26947e2d58153ef3"
+    },
+    {
+      "path": "package.json",
+      "bytes": 329,
+      "sha256": "97bc58ec67900e3812074faf60a7e03f41d8e8194345d59f34f3bb11d7d9c71e"
+    },
+    {
+      "path": "README-DESKTOP.md",
+      "bytes": 5547,
+      "sha256": "a72f84ff3e6b650d5ef79f44a4585a83aac850e8a3918c0b30147a48150956d7"
+    },
+    {
+      "path": "README.md",
+      "bytes": 5547,
+      "sha256": "a72f84ff3e6b650d5ef79f44a4585a83aac850e8a3918c0b30147a48150956d7"
+    },
+    {
+      "path": "run.mjs",
+      "bytes": 734,
+      "sha256": "4d1b689b1f99f1779de5b1903934e2c2150fb2ed693c462f72bd27c6a512e7d4"
+    },
+    {
+      "path": "scheduler.mjs",
+      "bytes": 6939,
+      "sha256": "c2736ccf96f31f7bde0f6829e73d0b670f6b4e8c9339ce19904c22d1659cd6e0"
+    },
+    {
+      "path": "server.mjs",
+      "bytes": 10143,
+      "sha256": "dd3c76e9faec232de91ea71ab8bba2e18d304471d376a06b15ca60aca63085ca"
+    },
+    {
+      "path": "src/config.mjs",
+      "bytes": 3760,
+      "sha256": "d310f6fddc5f4dfc07b04b1b8e5eb248e3bf3583ef56101830e9514963ac53a9"
+    },
+    {
+      "path": "src/enrich.mjs",
+      "bytes": 10336,
+      "sha256": "e01978d1df86e09b38e060a594d487cd4976fe63f5e487e182f327f5434a7a41"
+    },
+    {
+      "path": "src/facts.mjs",
+      "bytes": 4407,
+      "sha256": "55586d1c6e139b0450e9e303e5a4bc62297cd627ad6323c1dd9e048d04e23b91"
+    },
+    {
+      "path": "src/llm.mjs",
+      "bytes": 4265,
+      "sha256": "f5823b17eede81132488165e8f955e0ff4f31b63a06271bf65332e27ff91a9f5"
+    },
+    {
+      "path": "src/localization.mjs",
+      "bytes": 13140,
+      "sha256": "713911242a5003c920e7252b155f5147aefe080cf7b87ca3573cc20673a6d07e"
+    },
+    {
+      "path": "src/monitor.mjs",
+      "bytes": 1012,
+      "sha256": "8b2ca44265b53e7eb2508b78e942d89138f0394344dba9f25af04d7643f20940"
+    },
+    {
+      "path": "src/net.mjs",
+      "bytes": 3808,
+      "sha256": "5e1c06651b60541261b37cb56a90b9eac05b31dfd6b97750abeb65a516e103c9"
+    },
+    {
+      "path": "src/pipeline.mjs",
+      "bytes": 9239,
+      "sha256": "156b6ffbd1a2a458391608196e258e8e6640273754a3bd7c78a6cedbd2deec44"
+    },
+    {
+      "path": "src/report.mjs",
+      "bytes": 12084,
+      "sha256": "6c6e2f262b7347c008dce49fac57bbfb76d6a1835b8212d2679635199aec242d"
+    },
+    {
+      "path": "src/score.mjs",
+      "bytes": 2745,
+      "sha256": "c53da512be7f93671e9188412b14f6805bcd74f1d4a323a84b3a84ac526d5fc6"
+    },
+    {
+      "path": "src/search-terms.mjs",
+      "bytes": 2671,
+      "sha256": "62b37e42aff5716cc47399204d1cba5de6107d77c400b0e5d437383225ce2264"
+    },
+    {
+      "path": "src/search.mjs",
+      "bytes": 2761,
+      "sha256": "6b7319a570aecba21bd65279596c883f04e3acef555c20dc6aa547fb450f02e2"
+    },
+    {
+      "path": "src/social.mjs",
+      "bytes": 2812,
+      "sha256": "8dc7225e1145dbb72e8b38655c82f62b3abcc22d7cc2c5c3db6e91f7a9e3085d"
+    },
+    {
+      "path": "src/store.mjs",
+      "bytes": 2413,
+      "sha256": "bfee16cd4437035dee46eadeac5b1ac1a38c11befcb634384bbce5993531205f"
+    },
+    {
+      "path": "tests/custom-search.test.mjs",
+      "bytes": 2745,
+      "sha256": "e6690be79e2a0fb1499eb07ece68a4ee3224177d34c11e06300a021773db3a1f"
+    },
+    {
+      "path": "tests/desktop.test.mjs",
+      "bytes": 3455,
+      "sha256": "5bc63f1ab7ea3ebbfd161c95643fa33a57c8ef9353e7683dd38f7e6188cba3a3"
+    },
+    {
+      "path": "tests/live-run.mjs",
+      "bytes": 812,
+      "sha256": "3eaf3616419fee8185ac10f0bb8c9422aef53e4a7a2e4f130a9ec462890e4337"
+    },
+    {
+      "path": "tests/localization.test.mjs",
+      "bytes": 6285,
+      "sha256": "8ac03171a1a85429f1a12337d584be7a0eff78da087ad73a2d437a34d77b3ee1"
+    },
+    {
+      "path": "tests/regression.test.mjs",
+      "bytes": 11932,
+      "sha256": "aabaceceb53084c18d8f0eeb9873b2f07bd77e897c346496535d88f877f1ca67"
+    },
+    {
+      "path": "verification/test-results-3.2.0.txt",
+      "bytes": 2741,
+      "sha256": "3866349c7915c2da0268cb26893e65eb12cea7c380842695536430d6a1689e70"
+    },
+    {
+      "path": "wm-report.json",
+      "bytes": 19658,
+      "sha256": "c825aefc75d5d5d2cf36eaa841d41d4fda423dd37bf03103ed03aa7bd585419e"
+    }
+  ],
+  "excluded": [
+    "API credentials",
+    "runtime config",
+    "customer database",
+    "contact notes",
+    "desktop session tokens",
+    "translation cache",
+    "build intermediates"
+  ]
+}
