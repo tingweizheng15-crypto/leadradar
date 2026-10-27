@@ -356,6 +356,25 @@ v2 流水线已知边界：
 
 ---
 
+## 备份到 GitHub
+
+私有仓库：`https://github.com/tingweizheng15-crypto/leadradar`
+
+Windows 上双击桌面的 `备份到GitHub.cmd` 即可提交并推送（脚本会自动写带时间戳的提交信息）；
+命令行等价于：
+
+```bash
+git add -A && git commit -m "备份 2026-10-27 16:35" && git push origin main
+```
+
+注意：`.env`、`config.json`、`out/`、`dist/`、`node_modules/` 都不入库（见 `.gitignore`）。
+API key 与检索词配置只存在本机，换电脑需要重新填或拷 `%LOCALAPPDATA%\LeadRadar`。
+
+这台机器直连 `github.com` 会超时，需走本机代理 7897；该仓库已单独配置
+`git config http.proxy`，不影响全局设置。
+
+---
+
 ## 说明
 
 样本库中的公司信息来自公开可查的企业官网、行业媒体与上市公司披露，核验日期 2026-10。所有「需求商品」「近期信号」均为基于公开在售品类与内容的**推断**，不代表在手采购计划。
