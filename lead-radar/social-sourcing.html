@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>社媒挖掘工作台 · 中小运动品牌 OEM 客户</title>
+<style>
+  :root{
+    --ink:#0f172a; --ink2:#475569; --ink3:#94a3b8;
+    --line:#e6e9ef; --bg:#f5f6f8; --card:#fff;
+    --red:#e11d48; --red-d:#be123c; --teal:#0f766e; --amber:#f59e0b;
+    --purple:#7c3aed; --blue:#0284c7;
+    --ok:#15803d; --warn:#b45309; --danger:#b91c1c;
+    --shadow:0 1px 2px rgba(15,23,42,.04), 0 8px 24px rgba(15,23,42,.05);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:"Inter","PingFang SC","Microsoft YaHei",system-ui,-apple-system,sans-serif;
+    background:var(--bg);color:var(--ink);font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased}
+  .app{display:grid;grid-template-columns:228px 1fr;min-height:100vh}
+  .sidebar{background:#fff;border-right:1px solid var(--line);padding:22px 16px;display:flex;flex-direction:column;gap:26px;
+    position:sticky;top:0;height:100vh}
+  .brand{display:flex;align-items:center;gap:10px;padding:0 6px}
+  .logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#e11d48,#7c3aed);
+    display:grid;place-items:center;color:#fff;font-weight:800;font-size:15px}
+  .brand h1{font-size:15px;margin:0}
+  .brand p{margin:0;font-size:11px;color:var(--ink3)}
+  .nav{display:flex;flex-direction:column;gap:2px}
+  .nav a{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:9px;text-decoration:none;color:var(--ink2);font-size:13px}
+  .nav a.on{background:#fff1f4;color:var(--red-d);font-weight:600}
+  .nav a:hover{background:#f7f8fa}
+  .nav .dot{width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.55}
+  .side-note{margin-top:auto;font-size:11px;color:var(--ink3);line-height:1.65;border-top:1px solid var(--line);padding:14px 6px 0}
+  .side-note b{color:var(--ink2)}
+
+  main{padding:26px 30px 70px;max-width:1500px;width:100%}
+  .topbar{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:18px}
+  .topbar h2{margin:0;font-size:22px;letter-spacing:-.4px}
+  .topbar p{margin:4px 0 0;color:var(--ink2);font-size:13px}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+  .banner{display:flex;gap:14px;padding:16px 18px;border-radius:13px;background:#fffbeb;border:1px solid #fde68a;margin-bottom:16px}
+  .banner .bi{width:30px;height:30px;border-radius:9px;background:#fef3c7;display:grid;place-items:center;font-size:15px;flex:0 0 auto}
+  .banner b{color:#92400e;display:block;font-size:13px;margin-bottom:3px}
+  .banner p{margin:0;font-size:12.5px;color:#78350f;line-height:1.7}
+  .banner .red{display:flex;gap:16px;flex-wrap:wrap;margin-top:8px;font-size:12px;color:#7c2d12}
+  .banner .red span{display:inline-flex;gap:5px;align-items:center}
+  .banner .red span::before{content:"✕";color:#b91c1c;font-weight:700}
+
+  .panel{padding:18px 20px;margin-bottom:16px}
+  .panel h3{margin:0 0 3px;font-size:14px}
+  .panel .sub{font-size:11.5px;color:var(--ink3);margin-bottom:14px}
+
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th{text-align:left;padding:9px 10px;background:#fcfdfe;border-bottom:1px solid var(--line);color:var(--ink3);
+    font-size:11px;font-weight:600;letter-spacing:.3px;white-space:nowrap}
+  td{padding:10px;border-bottom:1px solid #f1f4f8;vertical-align:top;color:var(--ink2)}
+  td b{color:var(--ink)}
+  tr:last-child td{border-bottom:none}
+  .tbl-wrap{overflow:auto;border:1px solid var(--line);border-radius:10px}
+
+  .tag{display:inline-block;font-size:10px;padding:2px 7px;border-radius:5px;background:#f1f5f9;color:var(--ink2);margin:1px 3px 1px 0;white-space:nowrap}
+  .tag.ok{background:#ecfdf5;color:#047857}
+  .tag.no{background:#fef2f2;color:#b91c1c}
+  .tag.mid{background:#fffbeb;color:#b45309}
+  .tag.p{background:#f5f3ff;color:#6d28d9}
+
+  .gen{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px;margin-bottom:16px}
+  .fgroup{display:flex;flex-direction:column;gap:7px}
+  .fgroup>span{font-size:11px;color:var(--ink3);font-weight:600;letter-spacing:.3px}
+  .chips{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 11px;font-size:12px;cursor:pointer;
+    color:var(--ink2);font-family:inherit}
+  .chip.on{background:#0f172a;border-color:#0f172a;color:#fff}
+  .chip.on.red{background:#fff1f4;border-color:#fecdd3;color:#be123c}
+
+  .qgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .qcard{border:1px solid var(--line);border-radius:11px;overflow:hidden;background:#fff}
+  .qhead{display:flex;align-items:center;gap:8px;padding:9px 12px;background:#fbfcfd;border-bottom:1px solid var(--line);font-size:12px;font-weight:600}
+  .qhead .pf{font-size:9.5px;padding:2px 6px;border-radius:4px;background:#0f172a;color:#fff;letter-spacing:.3px}
+  .qhead .cp{margin-left:auto;font-size:10.5px;color:var(--ink3);cursor:pointer;border:none;background:none;font-family:inherit}
+  .qhead .cp:hover{color:var(--red-d)}
+  .qbody{padding:10px 12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:#334155;
+    line-height:1.7;white-space:pre-wrap;word-break:break-word;background:#fff}
+  .qhint{font-size:10.5px;color:var(--ink3);padding:0 12px 10px;line-height:1.6;background:#fff}
+
+  .steps{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
+  .step{border:1px solid var(--line);border-radius:10px;padding:10px 11px;background:#fcfdfe}
+  .step .d{font-size:10px;color:var(--ink3);letter-spacing:.6px}
+  .step b{display:block;font-size:12px;margin:3px 0 4px}
+  .step span{font-size:10.5px;color:var(--ink2);line-height:1.55}
+
+  .score td:first-child{white-space:nowrap;font-weight:600;color:var(--ink)}
+  .score .num{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;color:var(--ink)}
+
+  .btn{display:inline-flex;align-items:center;gap:7px;border:none;border-radius:9px;padding:9px 14px;font-size:12.5px;
+    cursor:pointer;font-family:inherit;font-weight:600;background:#0f172a;color:#fff}
+  .btn.ghost{background:#fff;border:1px solid var(--line);color:var(--ink2);font-weight:500}
+  .btn.ghost:hover{border-color:#cbd5e1}
+  .btn.red{background:linear-gradient(135deg,#e11d48,#be123c);box-shadow:0 5px 14px rgba(225,29,72,.2)}
+
+  .foot{font-size:11px;color:var(--ink3);line-height:1.8}
+  .foot b{color:var(--ink2)}
+  .toast{position:fixed;bottom:22px;left:50%;transform:translate(-50%,20px);background:#0f172a;color:#fff;
+    padding:10px 16px;border-radius:10px;font-size:12.5px;opacity:0;pointer-events:none;transition:.22s;z-index:80}
+  .toast.on{opacity:1;transform:translate(-50%,0)}
+  @media(max-width:1080px){.qgrid{grid-template-columns:1fr}.steps{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:820px){.app{grid-template-columns:1fr}.sidebar{display:none}main{padding:18px}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><div class="logo">LR</div><div><h1>LeadRadar</h1><p>获客雷达 · B2B</p></div></div>
+    <nav class="nav">
+      <a href="index.html"><span class="dot"></span>获客仪表盘</a>
+      <a class="on" href="#"><span class="dot"></span>社媒挖掘</a>
+      <a href="index.html#matrix"><span class="dot"></span>需求矩阵</a>
+      <a href="index.html#method"><span class="dot"></span>数据源与规则</a>
+    </nav>
+    <div class="side-note">
+      <b>本页目标</b><br>
+      中小运动品牌 · OEM/ODM 需求 · 小单起订<br><br>
+      <b>产出</b><br>
+      检索词包 / 筛选卡 / 字段规范 / CSV 模板<br><br>
+      <span style="color:#b45309">只采集企业公开的业务联系方式，不抓个人账号。</span>
+    </div>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <div>
+        <h2>社媒挖掘工作台</h2>
+        <p>从公开内容里找「刚起步、要贴牌、单量不大」的运动品牌，并把联系方式整理成可跟进的结构化表。</p>
+      </div>
+    </div>
+
+    <div class="banner">
+      <div class="bi">!</div>
+      <div>
+        <b>先把边界说清楚：这套流程不抓粉丝列表、不导评论区个人账号、不猜邮箱群发。</b>
+        <p>原因很实际：粉丝和评论者里绝大多数是消费者或同行，采购负责人几乎不会在评论区留工作邮箱；批量抓取还会触发平台风控，账号先被封。真正能落地的路径是——<b>用内容找到品牌 → 回到官网/主页拿到企业自己公布的联系方式 → 用一句话确认对方是否负责采购</b>。下面所有检索式、字段和模板都围绕这条路径设计。</p>
+        <div class="red">
+          <span>批量抓取粉丝 / 关注列表</span>
+          <span>导出评论区个人账号</span>
+          <span>用私人号加好友、群发 DM</span>
+          <span>拼接猜测 Gmail 后群发</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1 平台矩阵 -->
+    <section class="card panel">
+      <h3>一、各渠道能拿到什么、拿不到什么</h3>
+      <div class="sub">同一家公司往往在三四个平台有账号，但只有官网/企业主页上的联系方式是可用的业务入口</div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>渠道</th><th>怎么找（合法入口）</th><th>可获得的联系方式</th><th>拿不到 / 不建议</th><th>可信度</th></tr></thead>
+          <tbody>
+            <tr><td><b>品牌独立站</b><br><span class="tag ok">首选</span></td>
+              <td>Google 搜品牌名 + official site；看 About / Wholesale / Stockists / Contact 页</td>
+              <td>sales@ / hello@ 企业邮箱、Wholesale 表单、公司地址、有时公开创始人邮箱</td>
+              <td>—</td><td>高（企业自述）</td></tr>
+            <tr><td><b>Instagram</b><br><span class="tag p">发现主阵地</span></td>
+              <td>hashtag + 关键词 + 地点标签；品牌 Reels 文案；官网反链</td>
+              <td>主页 bio 里的官网、邮箱按钮、门店地址；企业账号的公开 business email</td>
+              <td>粉丝/关注列表、评论区个人账号、私信群发</td><td>中（需回官网核验）</td></tr>
+            <tr><td><b>TikTok</b></td>
+              <td>关键词搜索、话题标签、TikTok Shop 店铺页、视频文案中的 wholesale 提示</td>
+              <td>bio 邮箱、店铺客服入口、官网链接</td>
+              <td>评论者身份、私信批量触达</td><td>中</td></tr>
+            <tr><td><b>Facebook</b></td>
+              <td>品牌 Page 的「关于」页；行业群组的公开帖（只读，不导成员）</td>
+              <td>Page 公开邮箱/电话/地址、Messenger 企业入口、群组内公开招商帖</td>
+              <td>群成员名单、个人主页信息</td><td>中高（Page 资料由企业维护）</td></tr>
+            <tr><td><b>YouTube</b></td>
+              <td>品牌频道「关于」页；产品测评视频的官方账号</td>
+              <td>频道 business email（品牌自填）、官网</td>
+              <td>—</td><td>中</td></tr>
+            <tr><td><b>LinkedIn</b></td>
+              <td>公司页筛选行业+规模+国家；用职务词找人</td>
+              <td>公司官网、公司页、公共职业身份（用于确认谁负责采购）</td>
+              <td>个人私人邮箱/手机；付费导出联系人</td><td>高（职务）</td></tr>
+            <tr><td><b>LINE OA</b><br><span class="tag">泰国</span></td>
+              <td>品牌官网底部 LINE 按钮；LINE 官方账号搜索</td>
+              <td>企业 1:1 咨询入口、优惠与新品通知</td>
+              <td>陌生人群发（OA 只对已互动用户开放）</td><td>高（企业官方）</td></tr>
+            <tr><td><b>KakaoTalk Channel</b><br><span class="tag">韩国</span></td>
+              <td>品牌官网「카카오톡 채널」按钮</td>
+              <td>企业频道 1:1 咨询、客服转接</td>
+              <td>采购负责人个人 KaKao</td><td>高</td></tr>
+            <tr><td><b>WhatsApp Business</b><br><span class="tag">泰/印尼/马来/英</span></td>
+              <td>官网 Contact 页、Facebook Page 的 WhatsApp 按钮</td>
+              <td>企业公开 Business 号码</td>
+              <td>未经许可的营销群发（需 opt-in）</td><td>高（企业公布）</td></tr>
+            <tr><td><b>Shopee / Lazada / TikTok Shop</b></td>
+              <td>店铺「关于卖家」、发货地、品牌旗舰店</td>
+              <td>店铺客服、企业名、发货仓所在地</td>
+              <td>卖家私人信息</td><td>中（适合判断规模）</td></tr>
+            <tr><td><b>展会 / 协会 / B2B 名录</b></td>
+              <td>The Running Event、National Running Show、ThaiTrade、Indotrading、Musinsa 品牌页</td>
+              <td>参展商公开邮箱、展位联系人、公司地址</td>
+              <td>名录里的个人手机</td><td>高（主办方资料）</td></tr>
+            <tr><td><b>微信</b></td>
+              <td>展会名片、商会引荐、对方官网公开二维码</td>
+              <td>企业微信 / 个人工作号（对方主动给出时）</td>
+              <td>按手机号猜账号、买群成员</td><td>高（但只适合熟人/展后）</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 2 检索词生成器 -->
+    <section class="card panel">
+      <h3>二、检索词生成器</h3>
+      <div class="sub">选市场、产品和品牌阶段，生成可直接粘贴到 Google / Instagram / TikTok / LinkedIn 的检索式</div>
+
+      <div class="gen">
+        <div class="fgroup"><span>目标市场</span><div class="chips" id="mkChips"></div></div>
+        <div class="fgroup"><span>产品</span><div class="chips" id="pdChips"></div></div>
+        <div class="fgroup"><span>品牌阶段</span><div class="chips" id="stChips"></div></div>
+        <div class="fgroup"><span>操作</span>
+          <div class="chips">
+            <button class="btn red" id="genBtn">生成检索词包</button>
+            <button class="btn ghost" id="copyAll">复制全部</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="qgrid" id="qout"></div>
+    </section>
+
+    <!-- 3 评论区用法 -->
+    <section class="card panel">
+      <h3>三、评论区、视频、关注列表到底怎么用</h3>
+      <div class="sub">这些地方不产出联系方式，但产出高质量的「需求信号」和「品牌名单」——把它当线索层，不要当名单层</div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>来源</th><th>能提取到的信号</th><th>下一步动作</th><th>不要做</th></tr></thead>
+          <tbody>
+            <tr><td><b>品牌自己视频的评论区</b></td>
+              <td>品牌方回复里常出现 "we produce in small batches"、"our factory in…"、"restocking soon"；这类自述就是 OEM 证据</td>
+              <td>截图/记下原话与链接，写进 oem_evidence，再回官网找 Wholesale 页</td>
+              <td>不追着评论者要联系方式</td></tr>
+            <tr><td><b>测评 / 开箱视频</b></td>
+              <td>视频里 @ 到的新兴品牌、被对比的小众品牌，往往就是刚起步、正在找供应链的那批</td>
+              <td>把品牌名收集起来，逐个查 bio 里的官网，再走官网邮箱</td>
+              <td>不把博主本人当客户</td></tr>
+            <tr><td><b>TikTok 文案里的 "DM for wholesale"</b></td>
+              <td>明确 B2B 意图，说明对方已经在做批发或贴牌</td>
+              <td>走 bio 邮箱或 TikTok Shop 客服，问「你们现在压缩裤是哪家在做」</td>
+              <td>不用小号批量私信</td></tr>
+            <tr><td><b>Facebook 群组「求供应商」帖</b></td>
+              <td>最真实的采购需求：数量、品类、交期常常直接写在帖子里</td>
+              <td>看发帖人的公司 Page，走 Page 公开邮箱；群里公开回复也可</td>
+              <td>不导出群成员、不群发</td></tr>
+            <tr><td><b>关注列表（只看品牌关注了谁）</b></td>
+              <td>品牌关注了哪些面料商、代工厂、展会账号，能判断它的供应链成熟度</td>
+              <td>作为评分参考（OEM 证据项），不导出成员</td>
+              <td>不抓取、不批量导出</td></tr>
+            <tr><td><b>跑团 / 赛事活动帖的 @ 名单</b></td>
+              <td>参与品牌、赞助品牌、联名方，通常是本地小而美的牌子</td>
+              <td>按国家整理成候选池，回官网核验品类与规模</td>
+              <td>不私信活动参与者</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="margin-top:12px;font-size:12px;color:var(--ink2);background:#f8fafc;border:1px dashed var(--line);border-radius:10px;padding:11px 13px">
+        <b>一句话原则：</b>内容平台负责「发现谁在动」，企业官网 / 企业主页负责「怎么联系」。两者分开，既拿得到联系方式，也不会把账号做废。
+      </div>
+    </section>
+
+    <!-- 4 筛选标准 -->
+    <section class="card panel">
+      <h3>四、目标客户筛选标准（100 分制）</h3>
+      <div class="sub">重点不是「他卖不卖运动服」，而是「他有没有贴牌需求 + 单量是否匹配你的起订量」</div>
+      <div class="tbl-wrap" style="margin-bottom:14px">
+        <table class="score">
+          <thead><tr><th>维度</th><th>分值</th><th>加分证据（看到这些才给分）</th><th>扣分 / 排除</th></tr></thead>
+          <tbody>
+            <tr><td>品类契合</td><td class="num">25</td><td>在售压缩裤/紧身裤/跑步背心；产品图与你的工艺同类</td><td>只卖鞋、配件、休闲服 → 0–5</td></tr>
+            <tr><td>品牌阶段</td><td class="num">15</td><td>独立品牌、成立 1–5 年、团队 &lt;50 人、SKU &lt;40</td><td>大型集团自建供应链 → 0–3</td></tr>
+            <tr><td>OEM 证据</td><td class="num">20</td><td>自述 "made in Portugal/China"、"private label"、"our factory"、联名款、限量补货、预售</td><td>纯 drop-shipping 无品牌 → 0</td></tr>
+            <tr><td>单量匹配</td><td class="num">15</td><td>小批量 drop、单色单码、pre-order、只做 3–5 个 colorway</td><td>只做超大批量集采 → 5 以下</td></tr>
+            <tr><td>内容活跃</td><td class="num">10</td><td>近 90 天有上新、跑团活动、赛事合作</td><td>停更 &gt;12 个月 → 0</td></tr>
+            <tr><td>决策人可触达</td><td class="num">10</td><td>官网有 founder 署名、LinkedIn 能找到创始人/采购</td><td>只有客服机器人 → 2</td></tr>
+            <tr><td>证据强度</td><td class="num">5</td><td>信息来自官网/官方主页，日期可查</td><td>只有搜索摘要 → 1</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:10px;padding:12px 14px">
+          <b style="font-size:12px;color:#065f46">硬性保留条件（全部满足才进客户池）</b>
+          <div style="font-size:12px;color:#065f46;margin-top:6px;line-height:1.8">
+            · 有独立品牌名与可访问官网/店铺<br>
+            · 在售品类与你至少 1 个 SKU 重合<br>
+            · 能找到企业公开的业务联系方式<br>
+            · 可判断为独立经营实体（非代购、非平台聚合页）
+          </div>
+        </div>
+        <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:12px 14px">
+          <b style="font-size:12px;color:#991b1b">硬性排除（命中任一即放弃）</b>
+          <div style="font-size:12px;color:#991b1b;margin-top:6px;line-height:1.8">
+            · 年营收 &gt; 5 亿或员工 &gt; 500 的大品牌（自建供应链）<br>
+            · 纯代购 / 转售 / 无自有品牌<br>
+            · 同类工厂或贸易商（竞争者）<br>
+            · 只有个人账号、无企业主体<br>
+            · 拒绝批发、只做零售单品的博主店
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:12px;font-size:12px;color:var(--ink2);background:#f8fafc;border:1px dashed var(--line);border-radius:10px;padding:11px 13px">
+        <b>80 分以上</b>：直接进首触达队列 &nbsp;|&nbsp; <b>65–79</b>：补一条证据再决定 &nbsp;|&nbsp; <b>65 以下</b>：不进池，不要为了凑数降低门槛。
+      </div>
+    </section>
+
+    <!-- 4 字段规范 -->
+    <section class="card panel">
+      <h3>五、联系方式整理的字段与格式</h3>
+      <div class="sub">建议拆成两张表（公司表 + 联系人表），用 company_id 关联；不要把所有信息塞进一行，后面没法跟单</div>
+
+      <div class="tbl-wrap" style="margin-bottom:14px">
+        <table>
+          <thead><tr><th>表</th><th>字段</th><th>类型 / 取值</th><th>规则</th></tr></thead>
+          <tbody>
+            <tr><td rowspan="10"><b>公司表</b><br><span class="tag">companies</span></td><td>company_id</td><td>文本，如 TH-0012</td><td>国家码 + 序号，永不复用</td></tr>
+            <tr><td>brand_name / legal_name</td><td>文本</td><td>品牌名与法人名分开；法人名查不到就留空</td></tr>
+            <tr><td>country / city</td><td>ISO 国家码 + 城市</td><td>TH / Bangkok，不写「东南亚」这种模糊值</td></tr>
+            <tr><td>website</td><td>URL</td><td>规范化域名，不带参数</td></tr>
+            <tr><td>founded_year / employee_range</td><td>年份 / 1-10、11-50…</td><td>查不到写 unknown，不猜</td></tr>
+            <tr><td>products</td><td>多值：compression_tights / singlet / tight_pants</td><td>用固定枚举，便于筛选统计</td></tr>
+            <tr><td>oem_evidence</td><td>文本 + 证据 URL</td><td>写明看到的是哪一句（如 "made in Portugal"）</td></tr>
+            <tr><td>est_order_scale</td><td>S / M / L</td><td>S=单款 &lt;300 件，M=300–1000，L=&gt;1000</td></tr>
+            <tr><td>score / status</td><td>0–100 / qualified·review·rejected</td><td>≥80 合格，65–79 待复核</td></tr>
+            <tr><td>first_seen / last_checked</td><td>YYYY-MM-DD</td><td>超过 90 天未复核要标 stale</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="tbl-wrap" style="margin-bottom:14px">
+        <table>
+          <thead><tr><th>表</th><th>字段</th><th>类型 / 取值</th><th>规则</th></tr></thead>
+          <tbody>
+            <tr><td rowspan="9"><b>联系人表</b><br><span class="tag">contacts</span></td><td>contact_id / company_id</td><td>文本</td><td>一个公司可多条联系人</td></tr>
+            <tr><td>person_name / title</td><td>文本</td><td>只写公开职业身份，不写私人信息</td></tr>
+            <tr><td>role_type</td><td>founder / purchasing / product / marketing</td><td>决定首封信怎么写</td></tr>
+            <tr><td>email</td><td>邮箱</td><td>企业邮箱优先；个人邮箱仅在官网团队页公开时使用</td></tr>
+            <tr><td>email_status</td><td>confirmed_on_source / pattern_inferred / not_found</td><td>推测的一律标 pattern_inferred，不得当已确认</td></tr>
+            <tr><td>phone / whatsapp_business</td><td>带国家码 / yes·no·unverified</td><td>只记录企业公开号码；不推断是否开通 WhatsApp</td></tr>
+            <tr><td>line_id / kakao_channel / instagram / linkedin</td><td>企业账号</td><td>记录账号归属来源 URL</td></tr>
+            <tr><td>source_url / observed_at</td><td>URL + 日期</td><td>每个联系方式都要能点回去看</td></tr>
+            <tr><td>consent_basis / notes</td><td>文本</td><td>写清「官网公开」「展会名片」「对方主动提供」</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn ghost" id="dlCompanies">下载公司表 CSV 模板</button>
+        <button class="btn ghost" id="dlContacts">下载联系人表 CSV 模板</button>
+        <button class="btn ghost" id="dlQueries">导出当前检索词包 TXT</button>
+      </div>
+      <div style="font-size:11.5px;color:var(--ink3);margin-top:10px">
+        格式约定：CSV 用 UTF-8 with BOM（Excel 直接打开不乱码）；日期统一 YYYY-MM-DD；多值字段用英文分号 <code>;</code> 分隔；一条记录一行，不要在单元格里换行。
+      </div>
+    </section>
+
+    <!-- 5 执行节奏 -->
+    <section class="card panel">
+      <h3>六、7 天跑完第一批（目标 30 家合格客户）</h3>
+      <div class="sub">按这个节奏，一个人一周能产出 30 家可跟进的公司，而不是 5000 条无主邮箱</div>
+      <div class="steps">
+        <div class="step"><div class="d">DAY 1</div><b>建词表</b><span>6 国 × 3 产品的本地语言词，落成检索词包</span></div>
+        <div class="step"><div class="d">DAY 2</div><b>Google 扫官网</b><span>高级检索跑 20 条式子，收 60 个独立站</span></div>
+        <div class="step"><div class="d">DAY 3</div><b>IG / TikTok</b><span>40 个 hashtag，找刚起步的品牌，记官网</span></div>
+        <div class="step"><div class="d">DAY 4</div><b>取公开联系方式</b><span>只从 About / Wholesale / Contact 页取</span></div>
+        <div class="step"><div class="d">DAY 5</div><b>确认决策人</b><span>LinkedIn 核对创始人/采购职务，不导出私人信息</span></div>
+        <div class="step"><div class="d">DAY 6</div><b>打分排序</b><span>按 100 分制筛出前 30，剔除硬排除项</span></div>
+        <div class="step"><div class="d">DAY 7</div><b>首触达</b><span>人工审 10 封，一封信只问一个问题</span></div>
+      </div>
+      <div style="font-size:12px;color:var(--ink2);margin-top:12px;background:#f8fafc;border-radius:10px;padding:11px 13px;border:1px dashed var(--line)">
+        <b>日配额建议：</b>采集 60 家 → 合格 15–20 家 → 首触达 10–15 封。超过这个量，回复率会掉、账号风险会升，且你根本跟不过来。
+      </div>
+    </section>
+
+    <div class="foot">
+      <b>关于「直接联系方式」：</b>真正可直接使用的，是企业自己公布在官网、企业主页、展会资料上的业务邮箱/WhatsApp/LINE/Kakao。个人手机号、私人邮箱、粉丝与评论者账号不在可采集范围内，也不建议使用——这类名单的回复率通常低于 1%，还会让品牌方直接拉黑。<br>
+      <b>关于私信：</b>给企业账号发 DM 可以，但一个品牌只发一次、只发给确认是品牌方的账号、内容必须与对方产品有关；对方未回复就停止，不换号追问。<br>
+      <b>本页不连接任何平台接口、不执行抓取与发送</b>，只生成检索策略、筛选标准与数据结构。
+    </div>
+  </main>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const MARKETS = {
+  KR:{ n:"韩国", lang:"ko", kw:["압박 타이즈","러닝 싱글렛","레깅스"], role:["소량 제작","자체 브랜드","OEM"], tld:"co.kr" },
+  TH:{ n:"泰国", lang:"th", kw:["กางเกงรัดกล้ามเนื้อ","เสื้อกล้ามวิ่ง","เลกกิ้ง"], role:["ผลิต OEM","สั่งผลิตขั้นต่ำ","แบรนด์ตัวเอง"], tld:"co.th" },
+  ID:{ n:"印尼", lang:"id", kw:["celana kompresi lari","singlet lari","legging"], role:["produksi OEM","pesanan kecil","brand lokal"], tld:"co.id" },
+  MY:{ n:"马来西亚", lang:"ms", kw:["seluar kompresi","singlet lari","legging"], role:["OEM","pesanan kecil","jenama sendiri"], tld:"com.my" },
+  US:{ n:"美国", lang:"en", kw:["compression tights","running singlet","running tights"], role:["private label","small batch","wholesale"], tld:"com" },
+  UK:{ n:"英国", lang:"en", kw:["compression tights","running vest","running tights"], role:["private label","small batch","wholesale"], tld:"co.uk" }
+};
+const PRODUCTS = {
+  compression:{ n:"跑步压缩裤", en:"compression tights", hash:["compressiontights","runtights"] },
+  singlet:{ n:"跑步背心", en:"running singlet", hash:["runningsinglet","runningvest"] },
+  tights:{ n:"紧身运动裤", en:"tight sports pants", hash:["leggings","activetights"] }
+};
+const STAGES = {
+  new:{ n:"刚起步", hint:"成立 1–5 年、SKU 少、限量 drop" },
+  oem:{ n:"有 OEM 需求", hint:"自述 made in / private label / 联名" },
+  small:{ n:"小单起订", hint:"少量多色、预售、补货慢" }
+};
+
+const state = { markets:["TH","KR"], products:["compression","singlet"], stage:"oem" };
+
+const $ = s=>document.querySelector(s);
+const esc = s=>String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+
+function renderChips(){
+  $("#mkChips").innerHTML = Object.entries(MARKETS).map(([k,v])=>
+    `<button class="chip ${state.markets.includes(k)?"on":""}" data-mk="${k}">${v.n}</button>`).join("");
+  $("#pdChips").innerHTML = Object.entries(PRODUCTS).map(([k,v])=>
+    `<button class="chip ${state.products.includes(k)?"on red":""}" data-pd="${k}">${v.n}</button>`).join("");
+  $("#stChips").innerHTML = Object.entries(STAGES).map(([k,v])=>
+    `<button class="chip ${state.stage===k?"on":""}" data-st="${k}">${v.n}</button>`).join("");
+
+  document.querySelectorAll("[data-mk]").forEach(b=>b.onclick=()=>{
+    const k=b.dataset.mk;
+    state.markets = state.markets.includes(k)? state.markets.filter(x=>x!==k) : [...state.markets,k];
+    if(!state.markets.length) state.markets=[k];
+    renderChips(); build();
+  });
+  document.querySelectorAll("[data-pd]").forEach(b=>b.onclick=()=>{
+    const k=b.dataset.pd;
+    state.products = state.products.includes(k)? state.products.filter(x=>x!==k) : [...state.products,k];
+    if(!state.products.length) state.products=[k];
+    renderChips(); build();
+  });
+  document.querySelectorAll("[data-st]").forEach(b=>b.onclick=()=>{
+    state.stage=b.dataset.st; renderChips(); build();
+  });
+}
+
+function build(){
+  const mks = state.markets.map(k=>MARKETS[k]);
+  const enProduct = state.products.map(p=>PRODUCTS[p].en);
+  const localKw = mks.flatMap(m=>m.kw.filter((_,i)=>state.products[i]!==undefined));
+  const stageRole = state.stage==="oem" ? ["private label","OEM","made in"] :
+                    state.stage==="new" ? ["new brand","launch","pre-order"] :
+                    ["small batch","low MOQ","limited run"];
+  const localRole = mks.flatMap(m=>m.role);
+  const hash = state.products.flatMap(p=>PRODUCTS[p].hash);
+
+  const q = [];
+
+  q.push({
+    pf:"GOOGLE", title:"找独立站：官网 + 贴牌证据",
+    body: mks.map(m=>`site:.${m.tld} "${m.lang==="en" ? enProduct[0] : m.kw[0]}" (OEM OR wholesale OR "${m.role[2]}")`).join("\n") +
+          `\n"${enProduct[0]}" ("MOQ" OR "low MOQ") -site:amazon.com -site:aliexpress.com -site:alibaba.com`,
+    hint:"先看独立站有没有 Wholesale / About 页；有 MOQ 字样的页面优先级最高。"
+  });
+
+  q.push({
+    pf:"GOOGLE", title:"挖「刚起步」：预售 / 限量 / 首季",
+    body: mks.map(m=>`"${enProduct[0]}" ("coming soon" OR "pre-order" OR "first drop" OR "limited run") ${m.n}`).join("\n"),
+    hint:"预售和首季说明现金流紧、单量小，正是小单 OEM 的目标；大品牌不会写这些。"
+  });
+
+  q.push({
+    pf:"GOOGLE", title:"把社媒账号转成公司",
+    body: state.markets.map(k=>`site:instagram.com "${PRODUCTS[state.products[0]].hash[0]}" (${MARKETS[k].role[0]} OR "DM" OR "wholesale")`).join("\n") +
+          `\nsite:tiktok.com "@" ("${enProduct[0]}" OR "activewear") ("custom" OR "bulk")`,
+    hint:"只把账号当线索，必须回到 bio 里的官网或企业邮箱，不要直接私信陌生个人号。"
+  });
+
+  q.push({
+    pf:"INSTAGRAM / TIKTOK", title:"话题标签矩阵（按国家轮换）",
+    body: hash.map(h=>`#${h}brand  #${h}smallbusiness  #${h}design`).join("\n") +
+          "\n#activewearstartup  #fitnessapparelbrand  #sportswearbrand  #madein" + (state.stage==="oem"?"  #privatelabel":"") +
+          `\n地点标签：${mks.map(m=>m.n).join(" / ")} 主要城市 + 跑团聚集地`,
+    hint:"优先看 1k–50k 粉丝、近 30 天有新帖、简介里写 wholesale 或官网的品牌。"
+  });
+
+  q.push({
+    pf:"FACEBOOK", title:"Page 与行业群组（只读公开帖）",
+    body: state.markets.map(k=>`"${MARKETS[k].n}" activewear brand owners group`).join("\n") +
+          `\n"sportswear" "brand owners" ("manufacturer" OR "supplier") group\n` +
+          `site:facebook.com "${enProduct[0]}" ("MOQ" OR "wholesale")`,
+    hint:"群组只读公开帖找「求供应商」的帖子，不导出成员、不群发；Page 的关于页才是联系方式来源。"
+  });
+
+  q.push({
+    pf:"LINKEDIN", title:"按规模与职务找人",
+    body: `site:linkedin.com/company ("activewear" OR "sportswear") ("1-10" OR "11-50" OR "51-200") ${mks.map(m=>m.n).join(" OR ")}\n` +
+          `site:linkedin.com/in ("founder" OR "owner" OR "head of product") ("activewear" OR "sportswear") ${mks[0].n}`,
+    hint:"LinkedIn 只用来确认「谁负责采购/产品」，拿到姓名和职务后回到企业官网找公开邮箱。"
+  });
+
+  q.push({
+    pf:"LOCAL", title:"本地语言检索（决定能不能挖到本土品牌）",
+    body: mks.map(m=>`"${m.kw[0]}" "${m.role[0]}"`).join("\n") +
+          `\n${mks.map(m=>m.role[1]).filter((v,i,a)=>a.indexOf(v)===i).join(" / ")}`,
+    hint:"本土小品牌几乎不用英文写官网，本地语言检索是拉开差距的关键。"
+  });
+
+  q.push({
+    pf:"CHANNEL", title:"企业聊天入口（拿到后怎么用）",
+    body: "LINE OA：官网底部「เพิ่มเพื่อน / LINE Official」按钮\n" +
+          "KakaoTalk Channel：官网「카카오톡 채널」或品牌页 1:1 咨询\n" +
+          "WhatsApp Business：官网 Contact 页 / Facebook Page 按钮\n" +
+          "微信：仅展会名片、商会引荐、对方官网公开二维码",
+    hint:"第一句只做一件事：确认谁负责产品开发或采购，不要一次发完价格表、MOQ 和认证。"
+  });
+
+  $("#qout").innerHTML = q.map(c=>`<div class="qcard">
+      <div class="qhead"><span class="pf">${esc(c.pf)}</span>${esc(c.title)}
+        <button class="cp" data-copy="${esc(c.body)}">复制</button></div>
+      <div class="qbody">${esc(c.body)}</div>
+      <div class="qhint">${esc(c.hint)}</div>
+    </div>`).join("");
+
+  document.querySelectorAll("[data-copy]").forEach(b=>b.onclick=()=>copy(b.dataset.copy));
+}
+
+function copy(text){
+  if(navigator.clipboard && window.isSecureContext){
+    navigator.clipboard.writeText(text).then(()=>toast("已复制")).catch(()=>fallback(text));
+  } else fallback(text);
+}
+function fallback(text){
+  const ta=document.createElement("textarea");
+  ta.value=text; ta.style.position="fixed"; ta.style.opacity="0";
+  document.body.appendChild(ta); ta.select();
+  try{ document.execCommand("copy"); toast("已复制"); }catch(e){ toast("复制失败，请手动选中"); }
+  document.body.removeChild(ta);
+}
+
+function download(name, content, type="text/csv;charset=utf-8"){
+  const blob = new Blob(["\ufeff"+content], {type});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = name; a.click();
+  URL.revokeObjectURL(a.href);
+  toast("已下载 " + name);
+}
+
+const COMPANY_HEAD = ["company_id","brand_name","legal_name","country","city","website","founded_year","employee_range","buyer_type","products","oem_evidence","oem_signal_url","est_order_scale","instagram","tiktok","facebook","linkedin","line_id","whatsapp_business","email_public","email_status","score","status","first_seen","last_checked","owner","notes"];
+const CONTACT_HEAD = ["contact_id","company_id","person_name","title","role_type","email","email_status","phone","whatsapp_business","line_id","kakao_channel","instagram","linkedin_url","source_url","observed_at","consent_basis","notes"];
+
+const COMPANY_SAMPLE = ["TH-0001","Example Run Co.","Example Run Co., Ltd.","TH","Bangkok","examplerun.co.th","2023","1-10","brand","compression_tights;singlet","官网写 made in China, private label available","https://examplerun.co.th/about","S","@examplerun","@examplerun","examplerun","company/examplerun","@examplerun","unverified","hello@examplerun.co.th","confirmed_on_source","86","qualified","2026-10-26","2026-10-26","me","首季只有 4 个 SKU，正在找压缩裤供应商"];
+
+const CONTACT_SAMPLE = ["TH-0001-C1","TH-0001","Napat S.","Founder","founder","hello@examplerun.co.th","confirmed_on_source","","unverified","@examplerun","","@examplerun","https://www.linkedin.com/in/example","https://examplerun.co.th/contact","2026-10-26","官网公开邮箱","英文沟通，回复较快"];
+
+$("#dlCompanies").onclick = ()=>download("companies-template.csv", COMPANY_HEAD.join(",")+"\n"+COMPANY_SAMPLE.map(v=>`"${v}"`).join(",")+"\n");
+$("#dlContacts").onclick = ()=>download("contacts-template.csv", CONTACT_HEAD.join(",")+"\n"+CONTACT_SAMPLE.map(v=>`"${v}"`).join(",")+"\n");
+$("#dlQueries").onclick = ()=>{
+  const cards=[...document.querySelectorAll(".qcard")].map(c=>{
+    const t=c.querySelector(".qhead").innerText.replace(/\s*复制\s*$/,"").trim();
+    const b=c.querySelector(".qbody").innerText;
+    return `## ${t}\n${b}\n`;
+  });
+  download("query-pack.txt", cards.join("\n"), "text/plain;charset=utf-8");
+};
+$("#genBtn").onclick = ()=>{ build(); toast("已按当前选择生成"); };
+$("#copyAll").onclick = ()=>{
+  const all=[...document.querySelectorAll(".qcard")].map(c=>
+    `## ${c.querySelector(".qhead").innerText.replace(/\s*复制\s*$/,"").trim()}\n${c.querySelector(".qbody").innerText}`).join("\n\n");
+  copy(all);
+};
+
+let tt;
+function toast(m){ const el=$("#toast"); el.textContent=m; el.classList.add("on"); clearTimeout(tt); tt=setTimeout(()=>el.classList.remove("on"),2000); }
+
+renderChips(); build();
+</script>
+</body>
+</html>

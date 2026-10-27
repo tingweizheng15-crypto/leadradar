@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LeadRadar 获客雷达 · 跑步服饰 B2B 客户开发</title>
+<style>
+  :root{
+    --ink:#0f172a; --ink2:#475569; --ink3:#94a3b8;
+    --line:#e6e9ef; --bg:#f5f6f8; --card:#ffffff;
+    --red:#e11d48; --red-d:#be123c; --teal:#0f766e; --amber:#f59e0b;
+    --purple:#7c3aed; --blue:#0284c7; --slate:#64748b;
+    --ok:#15803d; --warn:#b45309;
+    --shadow:0 1px 2px rgba(15,23,42,.04), 0 8px 24px rgba(15,23,42,.05);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:"Inter","PingFang SC","Microsoft YaHei",system-ui,-apple-system,"Segoe UI",sans-serif;
+    background:var(--bg); color:var(--ink); font-size:14px; line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:inherit}
+  .app{display:grid;grid-template-columns:228px 1fr;min-height:100vh}
+
+  /* ---------- sidebar ---------- */
+  .sidebar{
+    background:#fff;border-right:1px solid var(--line);padding:22px 16px;
+    display:flex;flex-direction:column;gap:26px;position:sticky;top:0;height:100vh;
+  }
+  .brand{display:flex;align-items:center;gap:10px;padding:0 6px}
+  .logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#e11d48,#7c3aed);
+    display:grid;place-items:center;color:#fff;font-weight:800;font-size:15px;letter-spacing:-.5px}
+  .brand h1{font-size:15px;margin:0;font-weight:700;letter-spacing:-.2px}
+  .brand p{margin:0;font-size:11px;color:var(--ink3);letter-spacing:.3px}
+  .nav{display:flex;flex-direction:column;gap:2px}
+  .nav a{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:9px;text-decoration:none;
+    color:var(--ink2);font-size:13px}
+  .nav a.on{background:#fff1f4;color:var(--red-d);font-weight:600}
+  .nav a:hover{background:#f7f8fa}
+  .nav .dot{width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.55}
+  .side-note{margin-top:auto;font-size:11px;color:var(--ink3);line-height:1.6;padding:0 6px;border-top:1px solid var(--line);padding-top:14px}
+  .side-note b{color:var(--ink2)}
+
+  /* ---------- main ---------- */
+  main{padding:26px 30px 60px;max-width:1520px;width:100%}
+  .topbar{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:18px}
+  .topbar h2{margin:0;font-size:22px;letter-spacing:-.4px}
+  .topbar p{margin:4px 0 0;color:var(--ink2);font-size:13px}
+  .badge{display:inline-flex;align-items:center;gap:6px;font-size:11px;padding:5px 10px;border-radius:999px;
+    background:#fff7ed;color:#9a3412;border:1px solid #fed7aa;white-space:nowrap}
+  .badge i{width:6px;height:6px;border-radius:50%;background:#f97316;display:block}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+
+  /* ---------- control ---------- */
+  .control{padding:18px 20px 20px;margin-bottom:16px}
+  .searchrow{display:flex;gap:10px;flex-wrap:wrap}
+  .searchbox{flex:1;min-width:280px;position:relative}
+  .searchbox input{
+    width:100%;padding:13px 14px 13px 40px;border:1px solid var(--line);border-radius:11px;
+    font-size:14px;font-family:inherit;background:#fbfcfd;outline:none;transition:.15s
+  }
+  .searchbox input:focus{border-color:#fda4af;background:#fff;box-shadow:0 0 0 4px #fff1f4}
+  .searchbox svg{position:absolute;left:13px;top:13px;opacity:.45}
+  .btn-run{
+    padding:13px 22px;border:none;border-radius:11px;color:#fff;font-weight:600;font-size:14px;
+    background:linear-gradient(135deg,#e11d48,#be123c);cursor:pointer;font-family:inherit;
+    box-shadow:0 6px 16px rgba(225,29,72,.22);display:inline-flex;align-items:center;gap:8px;white-space:nowrap
+  }
+  .btn-run:hover{filter:brightness(1.05)}
+  .btn-run:disabled{opacity:.6;cursor:progress}
+  .filters{display:flex;gap:26px;flex-wrap:wrap;margin-top:16px}
+  .fgroup{display:flex;flex-direction:column;gap:8px}
+  .fgroup > span{font-size:11px;color:var(--ink3);letter-spacing:.4px;font-weight:600}
+  .chips{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 12px;font-size:12px;
+    cursor:pointer;color:var(--ink2);font-family:inherit;transition:.12s;display:inline-flex;align-items:center;gap:6px}
+  .chip:hover{border-color:#cbd5e1}
+  .chip.on{background:#0f172a;border-color:#0f172a;color:#fff}
+  .chip.on.p-red{background:#fff1f4;border-color:#fecdd3;color:#be123c}
+  .chip .sw{width:7px;height:7px;border-radius:2px;display:block}
+  .slider{display:flex;align-items:center;gap:10px}
+  .slider input{width:130px;accent-color:#e11d48}
+  .slider b{font-variant-numeric:tabular-nums;font-size:13px}
+
+  /* ---------- pipeline ---------- */
+  .pipeline{padding:14px 18px;margin-bottom:16px;display:none}
+  .pipeline.show{display:block}
+  .steps{display:flex;gap:8px;flex-wrap:wrap}
+  .step{flex:1;min-width:120px;padding:9px 10px;border-radius:9px;background:#f8fafc;border:1px solid #eef1f5;position:relative;overflow:hidden}
+  .step .s-top{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--ink3)}
+  .step.done .s-top{color:var(--ok)}
+  .step.act .s-top{color:var(--red-d)}
+  .step .s-detail{font-size:10.5px;color:var(--ink3);margin-top:3px;min-height:16px}
+  .step .bar{position:absolute;left:0;bottom:0;height:2px;background:var(--red);width:0;transition:width .3s}
+  .step.done .bar{background:var(--ok);width:100%}
+  .p-log{font-size:11px;color:var(--ink3);margin-top:10px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+
+  /* ---------- KPI ---------- */
+  .kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:16px}
+  .kpi{padding:15px 16px;border-radius:13px;background:#fff;border:1px solid var(--line);box-shadow:var(--shadow)}
+  .kpi .k{font-size:11px;color:var(--ink3);letter-spacing:.3px}
+  .kpi .v{font-size:26px;font-weight:700;letter-spacing:-1px;margin-top:4px;font-variant-numeric:tabular-nums}
+  .kpi .d{font-size:11px;color:var(--ink2);margin-top:2px}
+  .kpi.accent .v{color:var(--red)}
+  .kpi.teal .v{color:var(--teal)}
+  .kpi.purple .v{color:var(--purple)}
+
+  /* ---------- charts ---------- */
+  .grid3{display:grid;grid-template-columns:1.05fr 1.15fr .9fr;gap:14px;margin-bottom:16px}
+  .panel{padding:16px 18px}
+  .panel h3{margin:0 0 2px;font-size:13px;font-weight:700}
+  .panel .sub{font-size:11px;color:var(--ink3);margin-bottom:14px}
+  .donut-wrap{display:flex;align-items:center;gap:18px}
+  .donut{width:132px;height:132px;border-radius:50%;position:relative;flex:0 0 auto}
+  .donut::after{content:"";position:absolute;inset:22px;background:#fff;border-radius:50%}
+  .donut .mid{position:absolute;inset:0;display:grid;place-items:center;z-index:2;text-align:center}
+  .donut .mid b{font-size:22px;letter-spacing:-.8px;display:block;line-height:1}
+  .donut .mid span{font-size:10px;color:var(--ink3)}
+  .legend{display:flex;flex-direction:column;gap:7px;flex:1}
+  .lg{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--ink2)}
+  .lg i{width:8px;height:8px;border-radius:2px;display:block;flex:0 0 auto}
+  .lg b{margin-left:auto;color:var(--ink);font-variant-numeric:tabular-nums}
+
+  .hbar{display:flex;flex-direction:column;gap:12px}
+  .hrow{display:grid;grid-template-columns:84px 1fr 42px;align-items:center;gap:9px;font-size:12px}
+  .hrow .lab{color:var(--ink2);white-space:nowrap}
+  .track{height:9px;border-radius:6px;background:#f1f4f8;overflow:hidden}
+  .fill{height:100%;border-radius:6px;transition:width .6s cubic-bezier(.2,.8,.2,1)}
+  .hrow .num{text-align:right;font-variant-numeric:tabular-nums;color:var(--ink);font-weight:600}
+
+  .hist{display:flex;align-items:flex-end;gap:10px;height:130px;padding-top:8px}
+  .hcol{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:6px;height:100%}
+  .hcol .bar{width:100%;border-radius:6px 6px 3px 3px;background:#e2e8f0;transition:height .5s}
+  .hcol .n{font-size:12px;font-weight:600}
+  .hcol .l{font-size:10px;color:var(--ink3)}
+
+  /* ---------- matrix ---------- */
+  .matrix table{width:100%;border-collapse:separate;border-spacing:3px;font-size:12px}
+  .matrix th{font-weight:600;color:var(--ink3);font-size:11px;text-align:center;padding:4px}
+  .matrix td{text-align:center;padding:9px 4px;border-radius:7px;background:#f8fafc;font-variant-numeric:tabular-nums}
+  .matrix td.rowh{text-align:left;background:transparent;color:var(--ink2);font-weight:600;white-space:nowrap}
+
+  /* ---------- table ---------- */
+  .resbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+  .resbar .spacer{flex:1}
+  select,input.sm{font-family:inherit;font-size:12px;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink2);outline:none}
+  .btn-ghost{border:1px solid var(--line);background:#fff;border-radius:8px;padding:7px 11px;font-size:12px;cursor:pointer;font-family:inherit;color:var(--ink2);white-space:nowrap}
+  .btn-ghost:hover{border-color:#cbd5e1;color:var(--ink)}
+  table.data{width:100%;border-collapse:collapse;font-size:12.5px}
+  table.data th{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);color:var(--ink3);font-weight:600;font-size:11px;letter-spacing:.3px;white-space:nowrap;background:#fcfdfe;position:sticky;top:0;z-index:1}
+  table.data td{padding:11px 12px;border-bottom:1px solid #f1f4f8;vertical-align:middle}
+  table.data tr.row{cursor:pointer;transition:.1s}
+  table.data tr.row:hover{background:#fafbfc}
+  .co{display:flex;align-items:center;gap:9px}
+  .avatar{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;font-size:11px;font-weight:700;color:#fff;flex:0 0 auto}
+  .co b{display:block;font-size:12.5px;font-weight:600;line-height:1.3}
+  .co span{font-size:10.5px;color:var(--ink3)}
+  .tag{display:inline-block;font-size:10px;padding:2px 7px;border-radius:5px;background:#f1f5f9;color:var(--ink2);margin:1px 3px 1px 0;white-space:nowrap}
+  .tag.p0{background:#fff1f4;color:#be123c}
+  .tag.p1{background:#ecfdf5;color:#047857}
+  .tag.p2{background:#f5f3ff;color:#6d28d9}
+  .score{display:flex;align-items:center;gap:7px;min-width:76px}
+  .score .s{font-weight:700;font-variant-numeric:tabular-nums;width:22px}
+  .mini{height:5px;width:44px;border-radius:4px;background:#eef1f5;overflow:hidden}
+  .mini i{display:block;height:100%;border-radius:4px}
+  .st{font-size:10.5px;padding:2px 7px;border-radius:5px;font-weight:600;white-space:nowrap}
+  .st.q{background:#ecfdf5;color:#047857}
+  .st.r{background:#fffbeb;color:#b45309}
+
+  .empty{padding:56px 20px;text-align:center;color:var(--ink3)}
+  .empty .ic{width:56px;height:56px;border-radius:16px;background:#fff1f4;display:grid;place-items:center;margin:0 auto 14px;font-size:24px}
+  .empty b{display:block;color:var(--ink);font-size:15px;margin-bottom:4px}
+
+  /* ---------- drawer ---------- */
+  .scrim{position:fixed;inset:0;background:rgba(15,23,42,.28);opacity:0;pointer-events:none;transition:.2s;z-index:40}
+  .scrim.on{opacity:1;pointer-events:auto}
+  .drawer{position:fixed;top:0;right:0;height:100vh;width:440px;max-width:92vw;background:#fff;z-index:50;
+    transform:translateX(100%);transition:transform .26s cubic-bezier(.2,.8,.2,1);display:flex;flex-direction:column;
+    box-shadow:-20px 0 50px rgba(15,23,42,.14)}
+  .drawer.on{transform:none}
+  .dh{padding:20px 22px 16px;border-bottom:1px solid var(--line)}
+  .dh .row1{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+  .dh h3{margin:0;font-size:17px;letter-spacing:-.3px}
+  .dh .meta{font-size:11.5px;color:var(--ink3);margin-top:3px}
+  .close{border:none;background:#f1f5f9;width:28px;height:28px;border-radius:8px;cursor:pointer;color:var(--ink2);font-size:15px;line-height:1}
+  .scorebig{display:flex;align-items:baseline;gap:8px;margin-top:14px}
+  .scorebig b{font-size:34px;letter-spacing:-1.5px;color:var(--red)}
+  .scorebig span{font-size:11px;color:var(--ink3)}
+  .dbody{padding:18px 22px 40px;overflow:auto}
+  .dsec{margin-bottom:20px}
+  .dsec h4{margin:0 0 9px;font-size:11px;letter-spacing:.6px;color:var(--ink3);font-weight:700}
+  .reason{display:flex;gap:8px;font-size:12.5px;color:var(--ink2);margin-bottom:8px;line-height:1.6}
+  .reason i{width:5px;height:5px;border-radius:50%;background:var(--red);margin-top:7px;flex:0 0 auto}
+  .brk{display:flex;flex-direction:column;gap:8px}
+  .brow{display:grid;grid-template-columns:100px 1fr 32px;gap:8px;align-items:center;font-size:11.5px;color:var(--ink2)}
+  .brow .t{height:6px;background:#f1f4f8;border-radius:4px;overflow:hidden}
+  .brow .t i{display:block;height:100%;background:#0f172a;border-radius:4px}
+  .sig{border-left:2px solid #fecdd3;padding:2px 0 2px 10px;margin-bottom:9px}
+  .sig b{display:block;font-size:12px;font-weight:500;color:var(--ink)}
+  .sig span{font-size:10.5px;color:var(--ink3)}
+  .dl{display:grid;grid-template-columns:78px 1fr;gap:6px 10px;font-size:12px}
+  .dl dt{color:var(--ink3)}
+  .dl dd{margin:0;color:var(--ink);word-break:break-all}
+  .next{background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:12px 13px;font-size:12.5px;color:var(--ink2);line-height:1.65}
+  .disclaimer{font-size:10.5px;color:var(--ink3);line-height:1.6;border-top:1px dashed var(--line);padding-top:12px}
+
+  .foot{margin-top:22px;font-size:11px;color:var(--ink3);line-height:1.7}
+  .foot b{color:var(--ink2)}
+  .toast{position:fixed;bottom:22px;left:50%;transform:translate(-50%,20px);background:#0f172a;color:#fff;
+    padding:10px 16px;border-radius:10px;font-size:12.5px;opacity:0;pointer-events:none;transition:.22s;z-index:80}
+  .toast.on{opacity:1;transform:translate(-50%,0)}
+
+  @media (max-width:1180px){
+    .kpis{grid-template-columns:repeat(3,1fr)}
+    .grid3{grid-template-columns:1fr 1fr}
+  }
+  @media (max-width:820px){
+    .app{grid-template-columns:1fr}
+    .sidebar{display:none}
+    main{padding:18px}
+    .kpis{grid-template-columns:repeat(2,1fr)}
+    .grid3{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">LR</div>
+      <div>
+        <h1>LeadRadar</h1>
+        <p>获客雷达 · B2B</p>
+      </div>
+    </div>
+    <nav class="nav">
+      <a class="on" href="#"><span class="dot"></span>获客仪表盘</a>
+      <a href="#list"><span class="dot"></span>客户池</a>
+      <a href="#matrix"><span class="dot"></span>需求矩阵</a>
+      <a href="social-sourcing.html"><span class="dot"></span>社媒挖掘</a>
+      <a href="#method"><span class="dot"></span>数据源与规则</a>
+    </nav>
+    <div class="side-note">
+      <b>我方产品</b><br>
+      跑步压缩裤 / 跑步背心 / 紧身运动裤<br><br>
+      <b>当前样本库</b><br>
+      <span id="sampleCount">—</span> 家 · 6 国 · 公开信息核验<br><br>
+      <span style="color:#b45309">演示模式：采集过程为规则引擎模拟，非实时爬取。</span>
+    </div>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <div>
+        <h2>获客仪表盘</h2>
+        <p>输入关键词或商品，一键采集 → 识别需求 → 按国家与商品分类 → 匹配度评分。</p>
+      </div>
+      <div class="badge"><i></i>样本库 2026-10 核验 · 模拟采集</div>
+    </div>
+
+    <!-- control -->
+    <section class="card control">
+      <div class="searchrow">
+        <div class="searchbox">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+          <input id="kw" value="running compression tights / 跑步压缩裤" placeholder="输入商品、品类或关键词，例如 running singlet、紧身运动裤">
+        </div>
+        <button class="btn-run" id="runBtn">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L4.5 13.5h5L9 22l9.5-12h-5.2L13 2z"/></svg>
+          一键获客
+        </button>
+      </div>
+
+      <div class="filters">
+        <div class="fgroup">
+          <span>我方产品（可多选）</span>
+          <div class="chips" id="prodChips"></div>
+        </div>
+        <div class="fgroup">
+          <span>目标市场</span>
+          <div class="chips" id="mktChips"></div>
+        </div>
+        <div class="fgroup">
+          <span>合格线</span>
+          <div class="slider">
+            <input type="range" id="threshold" min="60" max="90" value="60" step="1">
+            <b id="thv">60</b>
+            <span style="font-size:11px;color:var(--ink3)">分以下不进入客户池</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- pipeline -->
+    <section class="card pipeline" id="pipeline">
+      <div class="steps" id="steps"></div>
+      <div class="p-log" id="plog">准备中…</div>
+    </section>
+
+    <!-- kpis -->
+    <section class="kpis" id="kpis"></section>
+
+    <!-- charts -->
+    <section class="grid3" id="charts"></section>
+
+    <!-- matrix -->
+    <section class="card panel matrix" id="matrix" style="margin-bottom:16px"></section>
+
+    <!-- results -->
+    <section class="card" id="list" style="overflow:hidden">
+      <div style="padding:16px 18px 0">
+        <div class="resbar">
+          <h3 style="margin:0;font-size:13px">客户池</h3>
+          <span id="resCount" style="font-size:11px;color:var(--ink3)"></span>
+          <div class="spacer"></div>
+          <select id="fStatus">
+            <option value="all">全部状态</option>
+            <option value="qualified">仅合格（≥80）</option>
+            <option value="review">仅待复核</option>
+          </select>
+          <select id="fCountry"><option value="all">全部国家</option></select>
+          <select id="fProduct"><option value="all">全部需求商品</option></select>
+          <select id="sortBy">
+            <option value="score">按匹配度</option>
+            <option value="country">按国家</option>
+            <option value="name">按公司名</option>
+          </select>
+          <button class="btn-ghost" id="exportBtn">导出 CSV</button>
+        </div>
+      </div>
+      <div id="tableWrap"></div>
+    </section>
+
+    <div class="foot" id="method">
+      <b>判断规则（模拟人工筛选）：</b>产品需求匹配 30 分 · 买家角色 20 分 · 地区 10 分 · 商业就绪度 15 分 · 近期活动信号 15 分 · 证据强度 10 分。
+      80 分及以上为合格，60–79 进入待复核，60 以下不进入客户池。评分随你勾选的商品组合动态变化。<br>
+      <b>接入真实采集：</b>当前为演示引擎，样本库为人工核验数据。要跑实时数据，可在后端接入 Google Custom Search / Bing Web Search 做官网发现，用 Playwright 抓官网产品页与 About 页，再接 ImportYeti（美国进口记录）或各国海关公开数据；评分仍沿用本页 6 个维度，不需要改前端。<br>
+      <b>数据说明：</b>样本库为公开可查的企业信息（官网、行业媒体、分销商资料、上市公司披露），核验日期 2026-10。
+      「需求商品」「近期信号」为基于公开在售品类与内容的推断，不等于在手采购计划；系统不自动发送邮件或私信，不采集个人隐私信息。
+    </div>
+  </main>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-hidden="true"></aside>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   LeadRadar — 规则引擎 + 样本库
+   采集为模拟流程，数据为公开信息核验样本
+   ============================================================ */
+
+const PRODUCTS = {
+  compression: { label: "跑步压缩裤", color: "#e11d48", cls: "p0" },
+  singlet:     { label: "跑步背心",   color: "#0f766e", cls: "p1" },
+  tights:      { label: "紧身运动裤", color: "#7c3aed", cls: "p2" }
+};
+const COUNTRIES = { KR:"韩国", TH:"泰国", US:"美国", UK:"英国", ID:"印尼", MY:"马来西亚" };
+const CCOLOR = { KR:"#e11d48", TH:"#0f766e", US:"#f59e0b", UK:"#7c3aed", ID:"#0284c7", MY:"#64748b" };
+const TYPES = {
+  brand:{ label:"自有品牌", role:20 },
+  distributor:{ label:"进口分销", role:19 },
+  retail:{ label:"专业零售", role:17 },
+  platform:{ label:"平台/连锁", role:15 },
+  mfr:{ label:"品牌+制造", role:11 }
+};
+
+const DATA = [
+  // ---------------- 韩国 ----------------
+  { id:"kr-xexymix", name:"XEXYMIX", zh:"젝시믹스（BrandX）", country:"KR", city:"首尔 城东区", type:"brand",
+    products:["compression","tights","singlet"], website:"xexymix.com", social:"Instagram @xexymix", scale:"L", b2b:true, evidence:"official",
+    note:"以紧身裤起家的运动休闲品牌，设 RX Running 跑步线，覆盖男装、高尔夫、泳装。",
+    signals:[{d:"2026-08",t:"RX Running 跑步长袖出货环比 +56%"},{d:"2026-10",t:"赞助 Jamsu Bridge 10K Night Run"},{d:"2026",t:"V업 3D 紧身裤累计销量超 1000 万件"}] },
+  { id:"kr-andar", name:"ANDAR", zh:"안다르", country:"KR", city:"首尔", type:"brand",
+    products:["compression","tights","singlet"], website:"andar.co.kr", social:"Instagram @andar_kr", scale:"L", b2b:true, evidence:"official",
+    note:"K-运动休闲头部品牌，含紧身裤、运动内衣、瑜伽普拉提与跑步品类，自建 AI Lab 研发面料。",
+    signals:[{d:"2026-10",t:"26FW 上新，跑步品类独立入口"},{d:"2026",t:"AI Lab 自研功能性面料对外传播"}] },
+  { id:"kr-toji", name:"SAN SAN GEAR / TOJI", zh:"산산기어（TOJI）", country:"KR", city:"首尔 龙山区", type:"brand",
+    products:["tights","singlet"], website:"sansangear.com", social:"官网 + 汉南洞旗舰店", scale:"M", b2b:false, evidence:"official",
+    note:"首尔城市机能品牌，2026 年推出跑步子品牌 TOJI，SS26 首季 10 款含 tights。",
+    signals:[{d:"2026-07",t:"TOJI SS26 发布，10 款含 tights"},{d:"2026",t:"汉南洞第二家旗舰店开业"}] },
+  { id:"kr-musinsa", name:"MUSINSA", zh:"무신사", country:"KR", city:"首尔", type:"platform",
+    products:["compression","tights","singlet"], website:"musinsa.com", social:"官网 + Musinsa Run 门店", scale:"L", b2b:false, evidence:"news",
+    note:"韩国最大时尚平台，运营 Musinsa Run Seoul Forest 跑步专门店与 Musinsa Standard 自有品牌。",
+    signals:[{d:"2026-09",t:"跑步防风衣搜索环比 4.4 倍"},{d:"2026",t:"跑步专门店持续办线下活动"}] },
+  { id:"kr-nylora", name:"NYLORA", zh:"나일로라", country:"KR", city:"首尔", type:"brand",
+    products:["tights","singlet"], website:"nylora.co.kr", social:"Instagram @nylora_kr", scale:"M", b2b:false, evidence:"official",
+    note:"首尔运动生活方式品牌，夹克、针织与裤装为主，媒体资料称覆盖瑜伽到跑步。",
+    signals:[{d:"2026-10",t:"26 Fall 系列上新"}] },
+
+  // ---------------- 泰国 ----------------
+  { id:"th-rev", name:"Rev Edition / REV RUNNR", zh:"รีฟ เอดิชัน", country:"TH", city:"曼谷 巴吞旺", type:"distributor",
+    products:["compression","tights","singlet"], website:"rev.co.th", social:"FB sportsrev.th / IG rev.runnr / LINE", scale:"L", b2b:true, evidence:"official",
+    note:"运动品牌进口分销商，代理 HOKA、Saucony、2XU、CEP 等，自营 REV RUNNR 跑步专门店 15 家以上。",
+    signals:[{d:"2024-10",t:"CRC Sports 收购 75% 股权"},{d:"2026",t:"REV RUNNR 门店与线上持续扩张"},{d:"2026",t:"代理 2XU、CEP 压缩品类"}] },
+  { id:"th-crc", name:"CRC Sports / Supersports", zh:"ซูเปอร์สปอร์ต", country:"TH", city:"曼谷 是隆", type:"retail",
+    products:["compression","tights","singlet"], website:"supersports.co.th", social:"官网 + 门店网络", scale:"L", b2b:true, evidence:"official",
+    note:"Central Retail 旗下泰国最大运动零售与分销商，98 家门店 + 144 家加盟店。",
+    signals:[{d:"2026",t:"Running 为官网一级品类"},{d:"2026",t:"蝉联区域零售与 ESG 奖项"}] },
+  { id:"th-nooption", name:"NO OPTION", zh:"โน option", country:"TH", city:"曼谷", type:"brand",
+    products:["compression","singlet"], website:"no-option.com", social:"LINE / Instagram / 邮件", scale:"S", b2b:false, evidence:"official",
+    note:"曼谷男子跑步与混合训练品牌，尼龙面料、无摩擦缝线、小批量 drop 模式。",
+    signals:[{d:"2026",t:"新品牌，limited drops 持续上新"},{d:"2026",t:"以曼谷跑团社区为起点"}] },
+  { id:"th-orym", name:"ORYM", zh:"โอรี่ย์ม", country:"TH", city:"曼谷", type:"brand",
+    products:["singlet","tights"], website:"", social:"Instagram @orym.official", scale:"S", b2b:false, evidence:"news",
+    note:"曼谷新锐跑服品牌，极简暗色系、外露车线、反光细节，以 Instagram 为主要阵地。",
+    signals:[{d:"2026",t:"被 GQ 列入曼谷必逛独立跑服品牌"}] },
+  { id:"th-warrix", name:"Warrix Sport PCL", zh:"วอริกซ์", country:"TH", city:"曼谷", type:"mfr",
+    products:["compression","singlet"], website:"warrix.com", social:"官网 + 品牌门店", scale:"L", b2b:true, evidence:"official",
+    note:"泰国上市运动服饰公司，做国家队与俱乐部球衣、compression suit，并代理 Asics、On 鞋类。",
+    signals:[{d:"2026",t:"产品线含 compression suit 与跑步服饰"},{d:"2026",t:"泰超与国家队球衣持续上新"}] },
+  { id:"th-brooo", name:"Brooo", zh:"บรู", country:"TH", city:"曼谷", type:"brand",
+    products:["singlet","tights"], website:"", social:"Instagram @brooo.official", scale:"S", b2b:false, evidence:"news",
+    note:"泰国轻量化越野跑与街头机能品牌，腰包为核心单品。",
+    signals:[{d:"2026",t:"GQ 泰国独立跑服品牌盘点收录"}] },
+  { id:"th-ridge", name:"ridge", zh:"ริดจ์", country:"TH", city:"曼谷", type:"brand",
+    products:["singlet"], website:"", social:"Instagram @ridge_weartheroute", scale:"S", b2b:false, evidence:"news",
+    note:"聚焦城市夜跑与越野，产品含帽子、背心、软水壶。",
+    signals:[{d:"2026",t:"轻量透气网布背心在代购圈走热"}] },
+  { id:"th-decathlon", name:"Decathlon Thailand", zh:"迪卡侬泰国", country:"TH", city:"曼谷", type:"platform",
+    products:["compression","tights","singlet"], website:"decathlon.co.th", social:"官网 + 门店", scale:"L", b2b:true, evidence:"official",
+    note:"法国体育零售集团泰国分支，自有跑步品牌 KIPRUN，深度参与本地赛事。",
+    signals:[{d:"2025-12",t:"曼谷午夜马拉松合作方"},{d:"2026",t:"KIPRUN 跑步系列持续扩充"}] },
+
+  // ---------------- 美国 ----------------
+  { id:"us-rrs", name:"Road Runner Sports", country:"US", city:"圣迭戈", type:"retail",
+    products:["compression","tights"], website:"roadrunnersports.com", social:"官网 + 52 家门店", scale:"L", b2b:true, evidence:"official",
+    note:"美国大型跑步专门连锁，52 家门店，自有品牌 Korsa 与 R-Gear。",
+    signals:[{d:"2026",t:"自有品牌服饰持续扩充"},{d:"2026",t:"VIP 会员体系带动复购"}] },
+  { id:"us-rw", name:"Running Warehouse", country:"US", city:"圣路易斯奥比斯波", type:"retail",
+    products:["compression","singlet"], website:"runningwarehouse.com", social:"官网 + YouTube", scale:"L", b2b:false, evidence:"official",
+    note:"美国头部跑步垂直电商，鞋服配件 SKU 覆盖广。",
+    signals:[{d:"2026",t:"跑步服饰品类持续扩充"}] },
+  { id:"us-fleetfeet", name:"Fleet Feet", country:"US", city:"卡伯勒", type:"retail",
+    products:["compression","tights","singlet"], website:"fleetfeet.com", social:"官网 + 门店", scale:"L", b2b:true, evidence:"official",
+    note:"美国最大跑步专门店加盟网络，提供 gait 分析与门店试穿。",
+    signals:[{d:"2026",t:"门店网络与本地跑团活动活跃"}] },
+  { id:"us-rei", name:"REI Co-op", country:"US", city:"肯特", type:"retail",
+    products:["tights","compression"], website:"rei.com", social:"官网 + 会员社区", scale:"L", b2b:false, evidence:"official",
+    note:"美国会员制户外零售，跑步品类含紧身裤、压缩层与配件。",
+    signals:[{d:"2026",t:"跑步品类页面与自有 Swiftland 系列"}] },
+  { id:"us-tracksmith", name:"Tracksmith", country:"US", city:"波士顿", type:"brand",
+    products:["singlet","tights"], website:"tracksmith.com", social:"Instagram", scale:"M", b2b:false, evidence:"official",
+    note:"波士顿跑步生活方式品牌，强调面料与版型，客单价高。",
+    signals:[{d:"2026",t:"季节系列与赛事限定款上新"}] },
+  { id:"us-rabbit", name:"rabbit", country:"US", city:"圣巴巴拉", type:"brand",
+    products:["singlet","tights"], website:"runinrabbit.com", social:"Instagram", scale:"M", b2b:true, evidence:"official",
+    note:"加州跑服品牌，背心与紧身裤为核心品类，主打轻量与速干。",
+    signals:[{d:"2026",t:"背心与 race 系列持续上新"}] },
+  { id:"us-janji", name:"Janji", country:"US", city:"波士顿", type:"brand",
+    products:["singlet","tights"], website:"janji.com", social:"Instagram", scale:"M", b2b:false, evidence:"official",
+    note:"波士顿跑服品牌，以图案背心与目的地系列为特色。",
+    signals:[{d:"2026",t:"季节图案系列上新"}] },
+  { id:"us-brooks", name:"Brooks Running", country:"US", city:"西雅图", type:"brand",
+    products:["compression","tights","singlet"], website:"brooksrunning.com", social:"官网 + 社媒", scale:"L", b2b:true, evidence:"official",
+    note:"美国头部跑鞋品牌，服饰线含压缩层、紧身裤与背心。",
+    signals:[{d:"2026",t:"服饰线随跑鞋系列同步更新"}] },
+  { id:"us-saucony", name:"Saucony", country:"US", city:"沃尔瑟姆", type:"brand",
+    products:["compression","tights"], website:"saucony.com", social:"官网 + 社媒", scale:"L", b2b:true, evidence:"official",
+    note:"美国跑鞋品牌，服饰与配件线覆盖压缩与紧身品类。",
+    signals:[{d:"2026",t:"竞速系列带动服饰配套上新"}] },
+
+  // ---------------- 英国 ----------------
+  { id:"uk-sportsshoes", name:"SportsShoes.com", country:"UK", city:"布拉德福德", type:"retail",
+    products:["compression","singlet","tights"], website:"sportsshoes.com", social:"官网 + 社媒", scale:"L", b2b:true, evidence:"official",
+    note:"英国大型跑步与户外电商，代理 100+ 品牌。",
+    signals:[{d:"2026",t:"跑步服饰品类持续扩张"}] },
+  { id:"uk-outlet", name:"The Running Outlet", country:"UK", city:"英国", type:"retail",
+    products:["compression","singlet"], website:"therunningoutlet.co.uk", social:"官网", scale:"M", b2b:false, evidence:"official",
+    note:"英国跑步折扣零售，鞋服配件为主。",
+    signals:[{d:"2026",t:"折扣渠道持续上新"}] },
+  { id:"uk-ronhill", name:"Ronhill", country:"UK", city:"曼彻斯特", type:"brand",
+    products:["compression","tights","singlet"], website:"ronhill.com", social:"官网 + 社媒", scale:"M", b2b:true, evidence:"official",
+    note:"英国老牌跑服品牌，覆盖紧身裤、背心与压缩层。",
+    signals:[{d:"2026",t:"经典系列与季节款更新"}] },
+  { id:"uk-ashmei", name:"ashmei", country:"UK", city:"英国", type:"brand",
+    products:["tights","singlet"], website:"ashmei.com", social:"官网", scale:"S", b2b:false, evidence:"official",
+    note:"英国高端跑服品牌，强调美利奴与高性能面料。",
+    signals:[{d:"2026",t:"高端系列小批量上新"}] },
+  { id:"uk-inov8", name:"inov-8", country:"UK", city:"湖区", type:"brand",
+    products:["tights","singlet"], website:"inov-8.com", social:"官网 + 社媒", scale:"M", b2b:true, evidence:"official",
+    note:"英国越野跑品牌，服饰线覆盖紧身裤与背心。",
+    signals:[{d:"2026",t:"越野系列与赛事合作"}] },
+
+  // ---------------- 印尼 ----------------
+  { id:"id-decathlon", name:"Decathlon Indonesia", country:"ID", city:"雅加达", type:"platform",
+    products:["compression","tights"], website:"decathlon.co.id", social:"官网 + 门店", scale:"L", b2b:true, evidence:"official",
+    note:"迪卡侬印尼分支，自有跑步品牌 KIPRUN。",
+    signals:[{d:"2026",t:"门店扩张与跑步系列上新"}] },
+  { id:"id-ortuseight", name:"Ortuseight", country:"ID", city:"雅加达", type:"brand",
+    products:["singlet","tights"], website:"ortuseight.com", social:"Instagram", scale:"M", b2b:true, evidence:"official",
+    note:"印尼本土运动品牌，以足球与跑步鞋服为主。",
+    signals:[{d:"2026",t:"跑步品类持续扩充"}] },
+  { id:"id-specs", name:"Specs", country:"ID", city:"雅加达", type:"brand",
+    products:["singlet","tights"], website:"specs.id", social:"Instagram", scale:"M", b2b:true, evidence:"official",
+    note:"印尼本土运动品牌，覆盖足球、跑步与训练服饰。",
+    signals:[{d:"2026",t:"本土赛事赞助与新品"}] },
+
+  // ---------------- 马来西亚 ----------------
+  { id:"my-alikhsan", name:"Al-Ikhsan Sports", country:"MY", city:"吉隆坡", type:"retail",
+    products:["compression","tights","singlet"], website:"alikhsan.com", social:"官网 + 门店", scale:"L", b2b:true, evidence:"official",
+    note:"马来西亚最大运动零售连锁之一，门店覆盖全国。",
+    signals:[{d:"2026",t:"门店网络与跑步品类扩张"}] },
+  { id:"my-decathlon", name:"Decathlon Malaysia", country:"MY", city:"八打灵再也", type:"platform",
+    products:["compression","tights"], website:"decathlon.com.my", social:"官网 + 门店", scale:"L", b2b:true, evidence:"official",
+    note:"迪卡侬马来西亚分支，自有 KIPRUN 跑步系列。",
+    signals:[{d:"2026",t:"跑步系列与门店活动"}] },
+  { id:"my-sportsdirect", name:"Sports Direct Malaysia", country:"MY", city:"吉隆坡", type:"retail",
+    products:["compression","singlet"], website:"sportsdirect.my", social:"官网", scale:"L", b2b:true, evidence:"official",
+    note:"英国 Frasers 集团旗下运动零售，马来西亚门店与电商。",
+    signals:[{d:"2026",t:"多品牌跑步服饰在售"}] }
+];
+
+/* ---------------- state ---------------- */
+const state = {
+  products:["compression","singlet","tights"],
+  markets:["KR","TH","US","UK","ID","MY"],
+  threshold:70,
+  keyword:"",
+  results:[],
+  ran:false,
+  filterStatus:"all",
+  filterCountry:"all",
+  filterProduct:"all",
+  sortBy:"score"
+};
+
+/* ---------------- helpers ---------------- */
+const $ = (s)=>document.querySelector(s);
+const esc = (s)=>String(s==null?"":s).replace(/[&<>"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+
+/* 七维评分：与 src/score.mjs 完全对齐（25/20/10/12/10/13/10 = 100）
+   之前这里是一套 30/20/10/15/15/10 的六维旧模型，和流水线报告不同源，已统一。 */
+const OEM_KEY = /private label|white label|custom logo|oem|odm|贴牌|代工|定制|customiz|personaliz|bespoke|your brand|made to order|주문제작|맞춤|รับผลิต|สั่งทำ/i;
+
+function oemOf(c){
+  const hay = [c.note || "", ...(c.signals || []).map(s => s.t)].join(" ");
+  if (OEM_KEY.test(hay)) return 13;
+  if (["brand", "distributor", "event", "platform"].includes(c.type)) return 8;
+  return 2;
+}
+
+function scoreOf(c){
+  const overlap = c.products.filter(p=>state.products.includes(p));
+  const ratio = state.products.length ? overlap.length/state.products.length : 0;
+
+  // 命中 1 个核心 SKU 15 / 2 个 20 / 3 个以上 25
+  const productScore = overlap.length === 0 ? 0 : overlap.length === 1 ? 15 : overlap.length === 2 ? 20 : 25;
+
+  const roleScore = TYPES[c.type].role;
+  const geoScore = state.markets.includes(c.country) ? 10 : 0;
+
+  // 商业就绪度 12：官网 3 / 社媒 3 / B2B 入口 3 / 基础分 3
+  let read = 3;
+  if(c.website) read += 3;
+  if(c.social) read += 3;
+  if(c.b2b) read += 3;
+  read = Math.min(12, read);
+
+  const act = Math.min(10, 2 + c.signals.length*2);
+  const oem = oemOf(c);
+  const ev = c.evidence==="official" ? 10 : c.evidence==="news" ? 8 : c.evidence==="directory" ? 6 : 5;
+
+  const total = Math.min(100, Math.round(productScore + roleScore + geoScore + read + act + oem + ev));
+  return { overlap, ratio, productScore, roleScore, geoScore, read:Math.round(read), act:Math.round(act), oem, ev, total };
+}
+
+function statusOf(score){ return score>=80 ? "qualified" : score>=60 ? "review" : "rejected"; }
+function statusLabel(s){ return s==="qualified" ? "合格" : s==="review" ? "待复核" : "已排除"; }
+function initials(n){
+  const clean = n.replace(/[^A-Za-z\u4e00-\u9fa5]/g,"");
+  return clean.slice(0,2).toUpperCase();
+}
+
+/* ---------------- controls ---------------- */
+function renderControls(){
+  $("#prodChips").innerHTML = Object.entries(PRODUCTS).map(([k,v])=>{
+    const on = state.products.includes(k);
+    return `<button class="chip ${on?"on p-red":""}" data-prod="${k}">
+      <span class="sw" style="background:${on?"#e11d48":v.color}"></span>${v.label}</button>`;
+  }).join("");
+  $("#mktChips").innerHTML = Object.entries(COUNTRIES).map(([k,v])=>{
+    const on = state.markets.includes(k);
+    return `<button class="chip ${on?"on":""}" data-mkt="${k}">${v}</button>`;
+  }).join("");
+  document.querySelectorAll("[data-prod]").forEach(b=>b.onclick=()=>{
+    const k=b.dataset.prod;
+    state.products = state.products.includes(k) ? state.products.filter(x=>x!==k) : [...state.products,k];
+    if(!state.products.length){ state.products=[k]; toast("至少保留一个产品"); }
+    renderControls();
+  });
+  document.querySelectorAll("[data-mkt]").forEach(b=>b.onclick=()=>{
+    const k=b.dataset.mkt;
+    state.markets = state.markets.includes(k) ? state.markets.filter(x=>x!==k) : [...state.markets,k];
+    if(!state.markets.length){ state.markets=[k]; toast("至少保留一个市场"); }
+    renderControls();
+  });
+}
+
+/* ---------------- pipeline ---------------- */
+const STEPS = [
+  { k:"search", label:"检索公开来源", detail:"官网 / 行业媒体 / 分销商资料 / 平台店铺" },
+  { k:"crawl",  label:"采集候选",     detail:"按国家与关键词抓取企业记录" },
+  { k:"dedupe", label:"域名去重",     detail:"规范化官网域名，合并同名实体" },
+  { k:"exclude",label:"硬排除",       detail:"消费者页面 / 无实体 / 竞品制造商" },
+  { k:"intent", label:"需求识别",     detail:"提取在售品类与近期活动信号" },
+  { k:"score",  label:"规则评分",     detail:"7 维度加权，按合格线分层" }
+];
+
+async function run(){
+  const kw = $("#kw").value.trim();
+  state.keyword = kw;
+  state.threshold = +$("#threshold").value;
+
+  const btn = $("#runBtn"); btn.disabled = true;
+  $("#pipeline").classList.add("show");
+  $("#steps").innerHTML = STEPS.map(s=>`<div class="step" data-k="${s.k}">
+      <div class="s-top"><span>○</span>${s.label}</div>
+      <div class="s-detail">${s.detail}</div><div class="bar"></div></div>`).join("");
+  $("#plog").textContent = `booting pipeline · keyword="${kw}" · markets=${state.markets.length} · products=${state.products.length}`;
+
+  const pool = DATA.filter(c=>state.markets.includes(c.country) && c.products.some(p=>state.products.includes(p)));
+  const scored = pool.map(c=>{
+    const s = scoreOf(c);
+    return { ...c, ...s, status: statusOf(s.total) };
+  });
+  const kept = scored.filter(r=>r.total >= state.threshold);
+  const raw = pool.length*5, dedupe = Math.round(pool.length*2.6), excluded = dedupe - pool.length;
+
+  const logs = [
+    `query → ${state.markets.length} markets · ${state.products.length} SKU · "${kw}"`,
+    `crawl → ${raw} 条原始记录（官网 / 媒体 / 分销商资料）`,
+    `dedupe → ${dedupe} 家（按官网域名归并）`,
+    `hard-filter → 排除 ${excluded} 家（消费者页面 / 无实体 / 竞争制造商）`,
+    `intent → 提取在售品类与 ${pool.reduce((a,c)=>a+c.signals.length,0)} 条近期信号`,
+    `score → ${pool.length} 家评分，${kept.length} 家进入客户池（合格线 ${state.threshold} 分）`
+  ];
+
+  for(let i=0;i<STEPS.length;i++){
+    document.querySelectorAll(".step").forEach((el,j)=>{
+      el.classList.toggle("act", j===i);
+      if(j<i) el.classList.add("done");
+    });
+    $("#plog").textContent = logs[i];
+    await sleep(320 + Math.random()*180);
+  }
+  document.querySelectorAll(".step").forEach(el=>{el.classList.remove("act");el.classList.add("done");});
+
+  state.results = kept.sort((a,b)=>b.total-a.total);
+
+  state.ran = true;
+  state.filterStatus="all"; state.filterCountry="all"; state.filterProduct="all";
+  $("#fStatus").value="all"; $("#fCountry").value="all"; $("#fProduct").value="all";
+
+  renderAll();
+  btn.disabled = false;
+  toast(`已采集 ${state.results.length} 家匹配客户`);
+
+  const qs = new URLSearchParams(location.search);
+  if(qs.has("open")) setTimeout(()=>openDrawer(qs.get("open")), 350);
+}
+
+const sleep = ms=>new Promise(r=>setTimeout(r,ms));
+
+/* ---------------- render ---------------- */
+function renderAll(){
+  renderKpis();
+  renderCharts();
+  renderMatrix();
+  renderTable();
+  renderFilterOptions();
+}
+
+function renderKpis(){
+  const rs = state.results;
+  const q = rs.filter(r=>r.status==="qualified").length;
+  const review = rs.filter(r=>r.status==="review").length;
+  const countries = new Set(rs.map(r=>r.country)).size;
+  const avg = rs.length ? Math.round(rs.reduce((a,r)=>a+r.total,0)/rs.length) : 0;
+  const hot = rs.filter(r=>r.total>=90).length;
+
+  const cards = [
+    { k:"客户总数", v:rs.length, d:`覆盖 ${countries} 个国家 / 地区`, cls:"" },
+    { k:"合格客户", v:q, d:"匹配度 ≥ 80 分", cls:"accent" },
+    { k:"高意向", v:hot, d:"匹配度 ≥ 90 分", cls:"teal" },
+    { k:"待复核", v:review, d:"60–79 分，需补证据", cls:"purple" },
+    { k:"平均匹配度", v:avg, d:"满分 100", cls:"" },
+    { k:"需求覆盖率", v:(rs.length?Math.round(rs.reduce((a,r)=>a+r.ratio,0)/rs.length*100):0)+"%", d:"与我方 SKU 重合度", cls:"" }
+  ];
+  $("#kpis").innerHTML = cards.map(c=>`<div class="kpi ${c.cls}">
+      <div class="k">${c.k}</div><div class="v">${c.v}</div><div class="d">${c.d}</div></div>`).join("");
+}
+
+function renderCharts(){
+  const rs = state.results;
+  const byC = {};
+  rs.forEach(r=>byC[r.country]=(byC[r.country]||0)+1);
+  const cEntries = Object.entries(byC).sort((a,b)=>b[1]-a[1]);
+
+  let acc = 0, segs = [];
+  cEntries.forEach(([k,v])=>{
+    const pct = rs.length ? v/rs.length*100 : 0;
+    segs.push(`${CCOLOR[k]} ${acc}% ${acc+pct}%`);
+    acc += pct;
+  });
+  const donutBg = segs.length ? `conic-gradient(${segs.join(",")})` : "#eef1f5";
+
+  const byP = {};
+  rs.forEach(r=>r.overlap.forEach(p=>byP[p]=(byP[p]||0)+1));
+  const pEntries = Object.entries(byP).sort((a,b)=>b[1]-a[1]);
+  const pMax = Math.max(1,...pEntries.map(e=>e[1]));
+
+  const bands = [
+    { l:"90–100", min:90, max:101, color:"#be123c" },
+    { l:"80–89", min:80, max:90, color:"#e11d48" },
+    { l:"70–79", min:70, max:80, color:"#f59e0b" },
+    { l:"60–69", min:60, max:70, color:"#94a3b8" }
+  ].map(b=>({...b, n:rs.filter(r=>r.total>=b.min && r.total<b.max).length}));
+  const bMax = Math.max(1,...bands.map(b=>b.n));
+
+  $("#charts").innerHTML = `
+    <div class="card panel">
+      <h3>国家 / 地区分布</h3>
+      <div class="sub">按客户注册地归类，共 ${cEntries.length} 个国家</div>
+      <div class="donut-wrap">
+        <div class="donut" style="background:${donutBg}">
+          <div class="mid"><div><b>${rs.length}</b><span>家客户</span></div></div>
+        </div>
+        <div class="legend">
+          ${cEntries.map(([k,v])=>`<div class="lg"><i style="background:${CCOLOR[k]}"></i>${COUNTRIES[k]}<b>${v}</b></div>`).join("") || `<div class="lg">暂无数据</div>`}
+        </div>
+      </div>
+    </div>
+
+    <div class="card panel">
+      <h3>需求商品分类</h3>
+      <div class="sub">客户在售 / 需要的品类与我方 SKU 交集</div>
+      <div class="hbar">
+        ${pEntries.map(([k,v])=>`<div class="hrow">
+          <div class="lab">${PRODUCTS[k].label}</div>
+          <div class="track"><div class="fill" style="width:${v/pMax*100}%;background:${PRODUCTS[k].color}"></div></div>
+          <div class="num">${v}</div></div>`).join("")}
+      </div>
+    </div>
+
+    <div class="card panel">
+      <h3>匹配度分布</h3>
+      <div class="sub">80 分以上可直接进入开发队列</div>
+      <div class="hist">
+        ${bands.map(b=>`<div class="hcol">
+          <div class="n">${b.n}</div>
+          <div class="bar" style="height:${Math.max(6,b.n/bMax*88)}%;background:${b.color}"></div>
+          <div class="l">${b.l}</div></div>`).join("")}
+      </div>
+    </div>`;
+}
+
+function renderMatrix(){
+  const rs = state.results;
+  const countries = [...new Set(rs.map(r=>r.country))]
+    .sort((a,b)=>rs.filter(r=>r.country===b).length - rs.filter(r=>r.country===a).length);
+  const prods = Object.keys(PRODUCTS).filter(p=>state.products.includes(p));
+  let max = 1;
+  const cell = (c,p)=>rs.filter(r=>r.country===c && r.overlap.includes(p)).length;
+  countries.forEach(c=>prods.forEach(p=>{ max=Math.max(max,cell(c,p)); }));
+
+  $("#matrix").innerHTML = `
+    <h3>国家 × 需求商品矩阵</h3>
+    <div class="sub">单元格数字为客户数，颜色越深表示该组合越集中 — 用于决定先发哪个市场的哪个 SKU</div>
+    <table>
+      <thead><tr><th style="text-align:left">国家 / 地区</th>${prods.map(p=>`<th>${PRODUCTS[p].label}</th>`).join("")}<th>合计</th></tr></thead>
+      <tbody>
+        ${countries.map(c=>{
+          const total = rs.filter(r=>r.country===c).length;
+          return `<tr><td class="rowh">${COUNTRIES[c]}</td>
+            ${prods.map(p=>{
+              const n = cell(c,p);
+              const a = n?0.10+0.62*(n/max):0;
+              return `<td style="background:rgba(225,29,72,${a.toFixed(2)});color:${a>0.5?"#fff":"#0f172a"}">${n||"–"}</td>`;
+            }).join("")}
+            <td style="background:#0f172a;color:#fff;font-weight:600">${total}</td></tr>`;
+        }).join("") || `<tr><td class="rowh" colspan="5">暂无数据</td></tr>`}
+      </tbody>
+    </table>`;
+}
+
+function renderFilterOptions(){
+  const rs = state.results;
+  const cs = [...new Set(rs.map(r=>r.country))];
+  $("#fCountry").innerHTML = `<option value="all">全部国家</option>` + cs.map(c=>`<option value="${c}">${COUNTRIES[c]}</option>`).join("");
+  const ps = [...new Set(rs.flatMap(r=>r.overlap))];
+  $("#fProduct").innerHTML = `<option value="all">全部需求商品</option>` + ps.map(p=>`<option value="${p}">${PRODUCTS[p].label}</option>`).join("");
+  $("#fCountry").value = state.filterCountry;
+  $("#fProduct").value = state.filterProduct;
+}
+
+function filtered(){
+  let rs = [...state.results];
+  if(state.filterStatus!=="all") rs = rs.filter(r=>r.status===state.filterStatus);
+  if(state.filterCountry!=="all") rs = rs.filter(r=>r.country===state.filterCountry);
+  if(state.filterProduct!=="all") rs = rs.filter(r=>r.overlap.includes(state.filterProduct));
+  if(state.sortBy==="country") rs.sort((a,b)=>a.country.localeCompare(b.country)||b.total-a.total);
+  else if(state.sortBy==="name") rs.sort((a,b)=>a.name.localeCompare(b.name));
+  else rs.sort((a,b)=>b.total-a.total);
+  return rs;
+}
+
+function renderTable(){
+  const rs = filtered();
+  const all = state.results.length;
+  $("#resCount").textContent = `显示 ${rs.length} / ${all} 家`;
+
+  if(!state.ran || !all){
+    $("#tableWrap").innerHTML = `<div class="empty">
+      <div class="ic">◎</div>
+      <b>还没有采集结果</b>
+      <div>输入关键词或商品，点击右上角「一键获客」开始</div></div>`;
+    return;
+  }
+  if(!rs.length){
+    $("#tableWrap").innerHTML = `<div class="empty"><div class="ic">∅</div><b>当前筛选没有结果</b><div>放宽状态、国家或商品筛选试试</div></div>`;
+    return;
+  }
+
+  const rows = rs.map(r=>{
+    const sc = statusOf(r.total);
+    return `<tr class="row" data-id="${r.id}">
+      <td><div class="co">
+        <div class="avatar" style="background:${CCOLOR[r.country]}">${initials(r.name)}</div>
+        <div><b>${esc(r.name)}</b><span>${esc(r.zh||r.website||"")}</span></div>
+      </div></td>
+      <td>${COUNTRIES[r.country]}<div style="font-size:10.5px;color:var(--ink3)">${esc(r.city)}</div></td>
+      <td><span class="tag">${TYPES[r.type].label}</span></td>
+      <td>${r.overlap.map(p=>`<span class="tag ${PRODUCTS[p].cls}">${PRODUCTS[p].label}</span>`).join("")}</td>
+      <td><div class="score"><span class="s">${r.total}</span>
+        <div class="mini"><i style="width:${r.total}%;background:${r.total>=80?"#e11d48":"#f59e0b"}"></i></div></div></td>
+      <td><span class="st ${sc==="qualified"?"q":"r"}">${statusLabel(sc)}</span></td>
+      <td style="max-width:220px;font-size:11.5px;color:var(--ink2)">${esc(r.signals[0]?.t||"—")}</td>
+      <td style="text-align:right"><button class="btn-ghost" data-open="${r.id}">详情</button></td>
+    </tr>`;
+  }).join("");
+
+  $("#tableWrap").innerHTML = `<div style="overflow:auto;max-height:640px">
+    <table class="data">
+      <thead><tr><th>客户</th><th>国家 / 城市</th><th>买家类型</th><th>需求商品</th><th>匹配度</th><th>状态</th><th>关键信号</th><th></th></tr></thead>
+      <tbody>${rows}</tbody></table></div>`;
+
+  document.querySelectorAll("[data-open]").forEach(b=>b.onclick=(e)=>{ e.stopPropagation(); openDrawer(b.dataset.open); });
+  document.querySelectorAll("tr.row").forEach(tr=>tr.onclick=()=>openDrawer(tr.dataset.id));
+}
+
+/* ---------------- drawer ---------------- */
+function reasonsFor(r){
+  const out = [];
+  out.push(`在售 / 需要 ${r.overlap.map(p=>PRODUCTS[p].label).join("、")}，与我方 ${state.products.map(p=>PRODUCTS[p].label).join("、")} 重合 ${r.overlap.length}/${state.products.length}。`);
+  const roleMap = {
+    brand:"自有品牌方，具备贴牌与换供应商的直接动机，首单可小批量。",
+    distributor:"进口分销商，已有同类品牌代理经验，采购语言一致，可承接整季货。",
+    retail:"专业零售渠道，门店即货架，适合以门店独家款切入。",
+    platform:"平台 / 连锁，量大但供应商准入与账期门槛高，适合中期目标。",
+    mfr:"自有制造能力，买方动机弱且存在竞争关系，仅在确认外采策略后接触。"
+  };
+  out.push(roleMap[r.type]);
+  if(r.signals.length){
+    out.push(`近期信号：${r.signals.map(s=>s.t).join("；")}。信号只说明其在动，不等于已下采购计划。`);
+  } else {
+    out.push("未找到近期活动信号，需人工补充核验。");
+  }
+  if(!r.website) out.push("没有官网，仅有社媒阵地，建议先确认经营主体与法人信息再投入。");
+  return out;
+}
+
+function nextAction(r){
+  if(r.type==="distributor") return "找到采购或品类经理，用其现有压缩品牌（如 2XU / CEP）的价格带做补位，先问「是否缺同价位段补充款」，不要先发整本画册。";
+  if(r.type==="brand") return "找到商品企划或创始人，用 1–2 个具体版型/面料指标（氨纶比例、回复率、腰头结构）切入，先寄对比样。";
+  if(r.type==="retail") return "找自有品牌 / 独家商品部门，而不是门店采购；提案「门店独家款 + 试销小单」。";
+  if(r.type==="platform") return "先确认供应商准入流程与验厂要求，再谈具体 SKU；不要把平台招商当成采购窗口。";
+  return "先核实其外采比例与代工策略，避免把竞争对手当客户。";
+}
+
+function openDrawer(id){
+  const r = state.results.find(x=>x.id===id);
+  if(!r) return;
+  const brk = [
+    ["产品需求匹配", r.productScore, 25],
+    ["买家角色", r.roleScore, 20],
+    ["地区", r.geoScore, 10],
+    ["商业就绪度", r.read, 12],
+    ["近期活动", r.act, 10],
+    ["定制/OEM 需求", r.oem, 13],
+    ["证据强度", r.ev, 10]
+  ];
+
+  $("#drawer").innerHTML = `
+    <div class="dh">
+      <div class="row1">
+        <div>
+          <h3>${esc(r.name)}</h3>
+          <div class="meta">${COUNTRIES[r.country]} · ${esc(r.city)} · ${TYPES[r.type].label}</div>
+        </div>
+        <button class="close" id="dclose">✕</button>
+      </div>
+      <div class="scorebig"><b>${r.total}</b><span>/ 100 匹配度 · ${statusLabel(statusOf(r.total))}</span></div>
+    </div>
+    <div class="dbody">
+      <div class="dsec">
+        <h4>为什么判定他有真实需求</h4>
+        ${reasonsFor(r).map(t=>`<div class="reason"><i></i><span>${esc(t)}</span></div>`).join("")}
+      </div>
+
+      <div class="dsec">
+        <h4>评分明细</h4>
+        <div class="brk">
+          ${brk.map(([l,v,m])=>`<div class="brow"><span>${l}</span>
+            <div class="t"><i style="width:${v/m*100}%;background:${v/m>0.75?"#e11d48":"#94a3b8"}"></i></div>
+            <span style="text-align:right;font-variant-numeric:tabular-nums">${v}/${m}</span></div>`).join("")}
+        </div>
+      </div>
+
+      <div class="dsec">
+        <h4>需求商品</h4>
+        ${r.overlap.map(p=>`<span class="tag ${PRODUCTS[p].cls}" style="font-size:11px;padding:3px 9px">${PRODUCTS[p].label}</span>`).join("")}
+        ${r.products.filter(p=>!r.overlap.includes(p)).map(p=>`<span class="tag" style="font-size:11px;padding:3px 9px;opacity:.55">${PRODUCTS[p].label}（未勾选）</span>`).join("")}
+      </div>
+
+      <div class="dsec">
+        <h4>近期信号</h4>
+        ${r.signals.map(s=>`<div class="sig"><b>${esc(s.t)}</b><span>${esc(s.d)} · 公开信息</span></div>`).join("") || `<div style="font-size:12px;color:var(--ink3)">未找到</div>`}
+      </div>
+
+      <div class="dsec">
+        <h4>公司信息</h4>
+        <dl class="dl">
+          <dt>主营业务</dt><dd>${esc(r.note)}</dd>
+          <dt>官网</dt><dd>${r.website?`<a href="https://${esc(r.website)}" target="_blank" rel="noopener" style="color:#be123c">${esc(r.website)} ↗</a>`:"未找到官网"}</dd>
+          <dt>社媒 / 入口</dt><dd>${esc(r.social||"未核验")}</dd>
+          <dt>规模判断</dt><dd>${r.scale==="L"?"大型（多国 / 多店）":r.scale==="M"?"中型（单国多店 / 成规模 DTC）":"小型（单店或小批量）"}</dd>
+          <dt>证据类型</dt><dd>${r.evidence==="official"?"官方页面":r.evidence==="news"?"行业媒体":"目录 / 第三方"}</dd>
+        </dl>
+      </div>
+
+      <div class="dsec">
+        <h4>建议首触达</h4>
+        <div class="next">${esc(nextAction(r))}</div>
+      </div>
+
+      <div class="disclaimer">
+        地址仅到城市级；本页所有「需求」判断来自公开在售品类与内容推断，未核验在手采购计划。
+        如需寄样，请先补齐街道地址与法人信息，并确认联系人职务。
+      </div>
+    </div>`;
+
+  $("#drawer").classList.add("on");
+  $("#drawer").setAttribute("aria-hidden","false");
+  $("#scrim").classList.add("on");
+  $("#dclose").onclick = closeDrawer;
+}
+function closeDrawer(){
+  $("#drawer").classList.remove("on");
+  $("#drawer").setAttribute("aria-hidden","true");
+  $("#scrim").classList.remove("on");
+}
+
+/* ---------------- export ---------------- */
+function exportCsv(){
+  const rs = filtered();
+  if(!rs.length){ toast("没有可导出的数据"); return; }
+  const head = ["公司","国家","城市","买家类型","需求商品","匹配度","状态","官网","关键信号","建议首触达"];
+  const lines = [head.join(",")];
+  rs.forEach(r=>{
+    const row = [
+      r.name, COUNTRIES[r.country], r.city, TYPES[r.type].label,
+      r.overlap.map(p=>PRODUCTS[p].label).join(" / "),
+      r.total, statusLabel(statusOf(r.total)), r.website||"",
+      r.signals.map(s=>`${s.d} ${s.t}`).join(" | "),
+      nextAction(r)
+    ].map(v=>`"${String(v).replace(/"/g,'""')}"`);
+    lines.push(row.join(","));
+  });
+  const blob = new Blob(["\ufeff"+lines.join("\r\n")], {type:"text/csv;charset=utf-8"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `leadradar-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast(`已导出 ${rs.length} 家客户`);
+}
+
+/* ---------------- toast ---------------- */
+let toastT;
+function toast(msg){
+  const el = $("#toast");
+  el.textContent = msg; el.classList.add("on");
+  clearTimeout(toastT);
+  toastT = setTimeout(()=>el.classList.remove("on"), 2200);
+}
+
+/* ---------------- bind ---------------- */
+$("#runBtn").onclick = run;
+$("#threshold").oninput = e=>{ state.threshold = +e.target.value; $("#thv").textContent = e.target.value; };
+$("#scrim").onclick = closeDrawer;
+$("#exportBtn").onclick = exportCsv;
+$("#fStatus").onchange = e=>{ state.filterStatus=e.target.value; renderTable(); };
+$("#fCountry").onchange = e=>{ state.filterCountry=e.target.value; renderTable(); };
+$("#fProduct").onchange = e=>{ state.filterProduct=e.target.value; renderTable(); };
+$("#sortBy").onchange = e=>{ state.sortBy=e.target.value; renderTable(); };
+$("#kw").addEventListener("keydown", e=>{ if(e.key==="Enter") run(); });
+document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeDrawer(); });
+
+renderControls();
+renderKpis();
+$("#sampleCount").textContent = DATA.length;
+$("#kpis").innerHTML = ["客户总数","合格客户","高意向","待复核","平均匹配度","需求覆盖率"]
+  .map(k=>`<div class="kpi"><div class="k">${k}</div><div class="v">–</div><div class="d">待采集</div></div>`).join("");
+$("#tableWrap").innerHTML = `<div class="empty"><div class="ic">◎</div><b>还没有采集结果</b>
+  <div>输入关键词或商品，点击「一键获客」开始</div></div>`;
+
+// 演示模式：URL 带 ?auto=1 时自动执行一次采集
+if(new URLSearchParams(location.search).has("auto")) setTimeout(run, 250);
+</script>
+</body>
+</html>

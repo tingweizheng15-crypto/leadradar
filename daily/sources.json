@@ -1,0 +1,18 @@
+{
+  "timezone": "Asia/Shanghai",
+  "watchlist": [
+    { "id": "ig-xexymix",     "channel": "instagram", "name": "XEXYMIX",           "handle": "xexymix",            "country": "KR", "type": "brand",       "products": "compression_tights;tight_pants;singlet" },
+    { "id": "ig-andar",       "channel": "instagram", "name": "ANDAR",             "handle": "andar_kr",           "country": "KR", "type": "brand",       "products": "tight_pants;compression_tights" },
+    { "id": "ig-revrunnr",    "channel": "instagram", "name": "REV RUNNR",         "handle": "rev.runnr",          "country": "TH", "type": "distributor", "products": "compression_tights;singlet;tight_pants" },
+    { "id": "ig-orym",        "channel": "instagram", "name": "ORYM",              "handle": "orym.official",      "country": "TH", "type": "brand",       "products": "singlet;tight_pants" },
+    { "id": "ig-brooo",       "channel": "instagram", "name": "Brooo",             "handle": "brooo.official",     "country": "TH", "type": "brand",       "products": "singlet;tight_pants" },
+    { "id": "ig-ridge",       "channel": "instagram", "name": "ridge",             "handle": "ridge_weartheroute", "country": "TH", "type": "brand",       "products": "singlet" },
+    { "id": "tk-xexymix",     "channel": "tiktok",    "name": "XEXYMIX",           "handle": "xexymix",            "country": "KR", "type": "brand",       "products": "compression_tights;tight_pants" },
+    { "id": "tk-tag-hash",    "channel": "tiktok",    "name": "#compressiontights", "handle": "tag/compressiontights", "country": "GLOBAL", "type": "hashtag", "products": "compression_tights" },
+    { "id": "site-rev",       "channel": "website",   "name": "Rev Edition",       "url": "https://www.rev.co.th/",             "country": "TH", "type": "distributor", "products": "compression_tights;singlet" },
+    { "id": "site-supersports","channel": "website",  "name": "Supersports",       "url": "https://www.supersports.co.th/en",   "country": "TH", "type": "retail",      "products": "compression_tights;singlet;tight_pants" },
+    { "id": "site-nooption",  "channel": "website",   "name": "NO OPTION",         "url": "https://no-option.com/",             "country": "TH", "type": "brand",       "products": "compression_tights;singlet" },
+    { "id": "site-ander",     "channel": "website",   "name": "ANDAR",             "url": "https://andar.co.kr/",               "country": "KR", "type": "brand",       "products": "tight_pants;compression_tights" }
+  ],
+  "keywords": ["compression tights", "running singlet", "running vest", "OEM activewear", "private label sportswear"]
+}

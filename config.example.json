@@ -1,0 +1,59 @@
+{
+  "schedule": {
+    "enabled": true,
+    "daily": "10:00:00",
+    "timezone": "Asia/Shanghai",
+    "daily_watch": { "enabled": true, "time": "09:30:00" }
+  },
+  "markets": ["KR", "TH", "US", "UK", "ID", "MY"],
+  "products": ["compression_tights", "running_singlet", "running_shorts", "quick_dry"],
+  "buyer_types": ["brand", "distributor", "retail", "event"],
+  "proxy": "",
+  "search": {
+    "provider": "serper",
+    "results_per_query": 8,
+    "max_queries_per_run": 30,
+    "include_social": true,
+    "timeout_ms": 15000,
+    "product_terms": {},
+    "country_terms": {},
+    "buyer_terms": {},
+    "query_templates": [],
+    "custom_queries": [],
+    "custom_mode": "append",
+    "serper": { "apiKey": "", "endpoint": "https://google.serper.dev/search" },
+    "bing": { "apiKey": "", "endpoint": "https://api.bing.microsoft.com/v7.0/search", "market": "en-US" },
+    "google_cse": { "apiKey": "", "cx": "", "endpoint": "https://www.googleapis.com/customsearch/v1" }
+  },
+  "llm": {
+    "provider": "none",
+    "base_url": "https://api.deepseek.com/v1",
+    "api_key": "",
+    "model": "deepseek-chat",
+    "max_tokens": 4000,
+    "json_mode": true
+  },
+  "contacts": {
+    "official_site": true,
+    "pages_to_try": ["", "contact", "about", "wholesale"],
+    "page_timeout_ms": 8000,
+    "max_html_bytes": 1500000,
+    "use_chrome_fallback": false,
+    "email_finder": {
+      "provider": "none",
+      "hunter": { "apiKey": "", "endpoint": "https://api.hunter.io/v2/domain-search" },
+      "apollo": { "apiKey": "", "endpoint": "https://api.apollo.io/v1/mixed_people/search" },
+      "snov": { "userId": "", "secret": "", "endpoint": "https://api.snov.io/v1/get-domain-emails-with-info" }
+    }
+  },
+  "scoring": {
+    "min_score": 60
+  },
+  "report": {
+    "out_dir": "out",
+    "open_after_run": false,
+    "notify": "auto",
+    "webhook_url": "",
+    "max_candidates_per_run": 30
+  }
+}

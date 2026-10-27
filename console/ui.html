@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LeadRadar 操作台</title>
+<style>
+  :root{
+    --ink:#0f172a; --ink2:#475569; --ink3:#94a3b8;
+    --line:#e6e9ef; --bg:#f5f6f8; --card:#fff;
+    --red:#e11d48; --red-d:#be123c; --ok:#15803d; --warn:#b45309; --bad:#b91c1c;
+    --shadow:0 1px 2px rgba(15,23,42,.04),0 8px 24px rgba(15,23,42,.05);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:"Inter","PingFang SC","Microsoft YaHei",system-ui,sans-serif;font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1180px;margin:0 auto;padding:22px 24px 64px}
+  header{display:flex;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+  .logo{width:36px;height:36px;border-radius:11px;background:linear-gradient(135deg,#e11d48,#7c3aed);color:#fff;display:grid;place-items:center;font-weight:800;font-size:14px}
+  h1{font-size:17px;margin:0;font-weight:700;letter-spacing:-.3px}
+  header p{margin:1px 0 0;font-size:11.5px;color:var(--ink3)}
+  .pills{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap}
+  .pill{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;padding:5px 11px;border-radius:999px;background:#fff;border:1px solid var(--line);color:var(--ink2)}
+  .pill i{width:6px;height:6px;border-radius:50%;background:var(--ink3);flex:0 0 auto}
+  .pill.on i{background:var(--ok)} .pill.off i{background:#f59e0b} .pill.bad i{background:var(--bad)}
+  .pill.click{cursor:pointer}
+  .pill.click:hover{border-color:#fda4af;color:var(--red-d);background:#fff1f4}
+  .banner{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:12px;padding:12px 16px;font-size:12.5px;margin-bottom:14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .banner .sp{flex:1}
+  .banner b{color:#7c2d12}
+  .banner button{padding:7px 13px;font-size:12px}
+  .cfg.flash{box-shadow:0 0 0 3px #ffe4e6}
+  .kvsub{font-size:10.5px;color:var(--ink3);margin:-5px 0 10px 160px;line-height:1.6}
+  @media(max-width:860px){.kvsub{margin-left:0}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+  .grid{display:grid;gap:12px;margin-bottom:14px}
+  .g2{grid-template-columns:1fr 1fr;align-items:start}
+  .g3{grid-template-columns:repeat(3,1fr)}
+  .stat{padding:14px 16px}
+  .stat .k{font-size:11px;color:var(--ink3);letter-spacing:.2px}
+  .stat .v{font-size:15px;font-weight:600;margin-top:5px;letter-spacing:-.2px;word-break:break-all}
+  .stat .s{font-size:11px;color:var(--ink2);margin-top:3px}
+  .stat .v.mono{font-family:ui-monospace,Menlo,monospace;font-size:13px}
+  .act{padding:16px 18px}
+  .act h2,.sect h2{font-size:13px;margin:0 0 12px;font-weight:700}
+  .btns{display:flex;gap:9px;flex-wrap:wrap}
+  button{font-family:inherit;font-size:13px;border-radius:10px;padding:10px 16px;cursor:pointer;border:1px solid var(--line);background:#fff;color:var(--ink);transition:.14s;display:inline-flex;align-items:center;gap:7px}
+  button:hover{border-color:#cbd5e1}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  button.primary{background:linear-gradient(135deg,#e11d48,#be123c);border:none;color:#fff;font-weight:600;box-shadow:0 6px 16px rgba(225,29,72,.2)}
+  button.primary:hover{filter:brightness(1.05)}
+  button.ghost{color:var(--ink2)}
+  button.danger{color:var(--bad);border-color:#fecaca}
+  .log{padding:0;overflow:hidden}
+  .logbar{display:flex;align-items:center;gap:10px;padding:11px 16px;border-bottom:1px solid var(--line);font-size:12px;color:var(--ink2)}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--ink3)}
+  .dot.run{background:var(--red);animation:pulse 1.1s infinite}
+  .dot.done{background:var(--ok)} .dot.failed{background:var(--bad)}
+  @keyframes pulse{0%{opacity:.35}50%{opacity:1}100%{opacity:.35}}
+  #log{height:300px;overflow:auto;padding:12px 16px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.7;color:#1e293b;background:#fbfcfd;white-space:pre-wrap;word-break:break-all}
+  #log .l0{color:#94a3b8}
+  .reports{padding:16px 18px}
+  .rep{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #f1f4f8;font-size:12.5px}
+  .rep:last-child{border-bottom:none}
+  .rep .tag{font-size:10px;padding:2px 7px;border-radius:5px;background:#f1f5f9;color:var(--ink2)}
+  .rep .date{font-weight:600}
+  .rep .time{color:var(--ink3);font-size:11px}
+  .rep .sp{flex:1}
+  .rep a{color:var(--red-d);text-decoration:none;font-size:12px}
+  .cfg{padding:16px 18px}
+  .row{display:grid;grid-template-columns:150px 1fr;gap:10px;align-items:center;margin-bottom:9px}
+  .row label{font-size:11.5px;color:var(--ink3)}
+  input{font-family:inherit;font-size:12.5px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fbfcfd;outline:none;color:var(--ink);width:100%}
+  select{font-family:inherit;font-size:12.5px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fbfcfd;outline:none;color:var(--ink);width:100%}
+  textarea{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.6;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:#fbfcfd;outline:none;color:var(--ink);width:100%;resize:vertical}
+  textarea:focus{border-color:#fda4af;background:#fff;box-shadow:0 0 0 3px #fff1f4}
+  code{font-family:ui-monospace,Menlo,monospace;font-size:11px;background:#f1f5f9;padding:1px 5px;border-radius:4px;color:#334155}
+  input:focus{border-color:#fda4af;background:#fff;box-shadow:0 0 0 3px #fff1f4}
+  .hint{font-size:11px;color:var(--ink3);margin-top:8px;line-height:1.7}
+  .foot{font-size:11px;color:var(--ink3);margin-top:16px;line-height:1.8}
+  iframe{width:100%;height:560px;border:1px solid var(--line);border-radius:12px;background:#fff;margin-top:12px}
+  .toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,16px);background:#0f172a;color:#fff;padding:10px 16px;border-radius:10px;font-size:12.5px;opacity:0;pointer-events:none;transition:.2s;z-index:90}
+  .toast.on{opacity:1;transform:translate(-50%,0)}
+  @media(max-width:860px){.g2,.g3{grid-template-columns:1fr}.row{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">LR</div>
+    <div>
+      <h1>LeadRadar 操作台</h1>
+      <p>本地控制台 · 只监听 127.0.0.1 · 所有操作都在项目目录内执行</p>
+    </div>
+    <div class="pills" id="pills"></div>
+  </header>
+
+  <div id="banner"></div>
+
+  <div class="grid g3">
+    <div class="card stat"><div class="k">获客流水线 · 下次运行</div><div class="v" id="s1">—</div><div class="s" id="s1s">每天 10:00:00</div></div>
+    <div class="card stat"><div class="k">每日采集 · 下次运行</div><div class="v" id="s2">—</div><div class="s" id="s2s">每天 09:30:00</div></div>
+    <div class="card stat"><div class="k">观察名单</div><div class="v" id="s3">—</div><div class="s" id="s3s">来源分布</div></div>
+  </div>
+
+  <div class="card act" style="margin-bottom:14px">
+    <h2>执行</h2>
+    <div class="btns">
+      <button class="primary" id="b-pipeline">▶ 跑一次获客（真实抓取）</button>
+      <button id="b-daily">▤ 跑一次每日采集</button>
+      <button class="ghost" id="b-doctor">♡ 环境体检</button>
+      <button class="ghost" id="b-live">◎ 联网实测（搜索 + 大模型）</button>
+      <button class="ghost" id="b-next">◷ 看下次时间</button>
+      <button class="danger" id="b-stop" disabled>■ 停止当前任务</button>
+    </div>
+    <div class="hint" id="hint">获客流水线会真实发请求、真实调用大模型（如已配置 key）；每日采集需要 Chrome，会截图留证。</div>
+  </div>
+
+  <div class="card log" style="margin-bottom:14px">
+    <div class="logbar"><span class="dot" id="ldot"></span><span id="lstate">空闲</span><span style="margin-left:auto;color:var(--ink3)" id="ltime"></span></div>
+    <div id="log"><span class="l0">等待操作……</span></div>
+  </div>
+
+  <div class="grid g2">
+    <div class="card reports">
+      <h2>历史报告</h2>
+      <div id="repList" style="font-size:12.5px;color:var(--ink3)">加载中…</div>
+    </div>
+    <div class="card cfg" id="cfgCard">
+      <h2>密钥与代理</h2>
+      <div class="row"><label>搜索方案</label>
+        <select id="SEARCH_PROVIDER" data-key="SEARCH_PROVIDER">
+          <option value="serper">Serper（Google 结果，最省事）</option>
+          <option value="bing">Bing Web Search（Azure 免费层）</option>
+          <option value="google_cse">Google Custom Search（每天 100 次免费）</option>
+        </select>
+      </div>
+      <div class="kvsub">搜索是「发现新客户」的唯一来源。不填 = 只能跑本地 10 条种子。</div>
+      <div class="row"><label>搜索 key</label><input id="SERPER_API_KEY" data-key="SERPER_API_KEY" placeholder="serper.dev 注册后拿到的 key" autocomplete="off"></div>
+      <div class="row"><label>大模型 key</label><input id="LLM_API_KEY" data-key="LLM_API_KEY" placeholder="留空表示不修改" autocomplete="off"></div>
+      <div class="kvsub">大模型负责「判断是不是买家 + 写开发信」。platform.deepseek.com 充值几元即可；通义/智谱/Kimi 也兼容。</div>
+      <div class="row"><label>大模型地址</label><input id="LLM_BASE_URL" data-key="LLM_BASE_URL" placeholder="https://api.deepseek.com/v1"></div>
+      <div class="row"><label>模型名</label><input id="LLM_MODEL" data-key="LLM_MODEL" placeholder="deepseek-chat"></div>
+      <div class="row"><label>输出上限 tokens</label><input id="LLM_MAX_TOKENS" data-key="LLM_MAX_TOKENS" placeholder="默认 4000；思考型模型建议 8000" inputmode="numeric"></div>
+      <div class="kvsub">思考型模型（deepseek-reasoner / flash / o1）的思考过程也吃这个额度，太小会让开发信为空。留空用默认 4000。</div>
+      <div class="row"><label>代理 HTTPS_PROXY</label><input id="HTTPS_PROXY" data-key="HTTPS_PROXY" placeholder="http://127.0.0.1:7890"></div>
+      <div class="kvsub" id="proxyNow">当前生效：—</div>
+
+      <details style="margin-top:6px">
+        <summary style="font-size:11.5px;color:var(--ink3);cursor:pointer;outline:none">更多密钥（Bing / Google CSE / 邮箱查找，可留空）</summary>
+        <div style="margin-top:10px">
+          <div class="row"><label>Bing key</label><input id="BING_API_KEY" data-key="BING_API_KEY" placeholder="选了 Bing 才需要"></div>
+          <div class="row"><label>Google CSE key</label><input id="GOOGLE_CSE_KEY" data-key="GOOGLE_CSE_KEY" placeholder="选了 CSE 才需要"></div>
+          <div class="row"><label>CSE 引擎 ID (cx)</label><input id="GOOGLE_CSE_CX" data-key="GOOGLE_CSE_CX" placeholder="cx= 后面那串"></div>
+          <div class="row"><label>Hunter 邮箱查找</label><input id="HUNTER_API_KEY" data-key="HUNTER_API_KEY" placeholder="可选：补全官网没写的邮箱"></div>
+        </div>
+      </details>
+
+      <div class="btns" style="margin-top:12px">
+        <button class="primary" id="b-save">保存到 .env</button>
+        <button class="ghost" id="b-reload">刷新</button>
+      </div>
+      <div class="hint">保存后下一轮任务即生效，无需重启。值只写入本机 <code>.env</code>（已在 .gitignore 内），页面回显为掩码。填完建议点「联网实测」验证 key 真的通。</div>
+    </div>
+  </div>
+
+  <div class="card cfg" id="queryCard" style="margin-bottom:14px">
+    <h2>检索词（决定能搜到什么客户）</h2>
+    <div class="hint" id="qSummary" style="margin:0 0 12px">加载中…</div>
+
+    <div class="row"><label>检索式模板</label>
+      <textarea id="qTemplates" rows="3" spellcheck="false" placeholder="{product} {buyer} {country}"></textarea>
+    </div>
+    <div class="kvsub">一行一条，按顺序铺满「产品 × 市场」。可用占位符：<code>{product}</code> 产品词 · <code>{buyer}</code> 买家类型词 · <code>{country}</code> 国家词。</div>
+
+    <div class="row"><label>自定义检索式</label>
+      <textarea id="qCustom" rows="3" spellcheck="false" placeholder="一行一条，原样发出，例如：&#10;site:.co.kr 러닝 레깅스 도매&#10;site:instagram.com &quot;compression tights&quot; Korea wholesale"></textarea>
+    </div>
+    <div class="kvsub">这是唯一能写「本地语言」和「site: 限定」的入口，比模板更精准。</div>
+
+    <div class="row"><label>自定义的处理方式</label>
+      <select id="qMode">
+        <option value="append">追加到模板之前（先跑自定义，再跑模板）</option>
+        <option value="replace">只用自定义（模板全部不跑）</option>
+      </select>
+    </div>
+    <div class="row"><label>每轮检索上限</label><input id="qMax" type="number" min="1" max="200" style="max-width:130px"></div>
+    <div class="kvsub">上限含社媒检索式，按次计费，调大前先看成本。</div>
+
+    <details style="margin-top:4px">
+      <summary style="font-size:11.5px;color:var(--ink3);cursor:pointer;outline:none">词表（产品 / 买家 / 国家，清空即恢复默认）</summary>
+      <div id="qTerms" style="margin-top:12px"></div>
+    </details>
+
+    <div class="btns" style="margin-top:12px">
+      <button class="primary" id="b-qsave">保存检索词</button>
+      <button class="ghost" id="b-qreset">恢复默认</button>
+    </div>
+    <div class="kvsub" id="qPreview" style="margin:10px 0 0;line-height:2"></div>
+  </div>
+
+  <div class="card cfg" style="margin-bottom:14px">
+    <h2>定时器与开机自启</h2>
+    <div id="timerBox">
+      <div class="row"><label>前台常驻（一个进程管两条链路）</label><input id="cmd1" value="node scheduler.mjs" readonly></div>
+      <div class="row"><label>注册开机自启</label><input id="cmd2" value="node scheduler.mjs --register-task" readonly></div>
+      <div class="btns" style="margin-top:4px">
+        <button class="ghost" data-copy="cmd1">复制命令 1</button>
+        <button class="ghost" data-copy="cmd2">复制命令 2</button>
+      </div>
+      <div class="hint">定时器必须常驻才生效：前台跑着，或按命令 2 注册成计划任务 / systemd 服务。关掉这个操作台不影响它。</div>
+    </div>
+  </div>
+
+  <div id="previewWrap" style="display:none;margin-top:6px">
+    <div style="font-size:11.5px;color:var(--ink3);margin-bottom:2px" id="previewName"></div>
+    <iframe id="preview"></iframe>
+  </div>
+
+  <div class="foot">
+    本操作台只做「触发 + 查看」，不代替你发任何消息。获客报告里的邮箱标注 (官方)/(候选)，候选邮箱发信前需人工验证。
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const api = (p, opt) => fetch(p, opt).then(r => r.json());
+let pollTimer = null, curJob = 0, lastLines = 0, LAST = null;
+
+function toast(m){ const el=$("#toast"); el.textContent=m; el.classList.add("on"); clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove("on"),2400); }
+function pill(cls, label, val, goto){
+  return `<span class="pill ${cls}${goto?" click":""}"${goto?` data-goto="${goto}" title="点击去填写"`:""}><i></i>${label} · ${val}</span>`;
+}
+function ago(ms){ if(ms<0) return "已过期"; const m=Math.floor(ms/60000); if(m<60) return m+" 分钟后"; const h=Math.floor(m/60); return h+" 小时 "+(m%60)+" 分后"; }
+
+function gotoConfig(key){
+  const card = $("#cfgCard");
+  card.scrollIntoView({behavior:"smooth",block:"center"});
+  card.classList.add("flash");
+  setTimeout(()=>card.classList.remove("flash"), 1800);
+  const el = $("#" + key);
+  if(el){ el.focus({ preventScroll: true }); el.scrollIntoView({behavior:"smooth",block:"center"}); }
+}
+
+function renderBanner(s){
+  const miss = [];
+  if(!s.keys.search) miss.push("<b>搜索 key</b> 没配 → 只能跑本地 10 条种子，拿不到新客户");
+  if(!s.keys.llm) miss.push("<b>大模型 key</b> 没配 → 没有 AI 买家判断与开发信草稿");
+  if(!miss.length){ $("#banner").innerHTML = ""; return; }
+  $("#banner").innerHTML = `<div class="banner" style="display:block">
+    <div>${miss.join("　·　")}</div>
+    <div style="margin-top:6px;color:#b45309">去哪拿：<b>Serper</b> → serper.dev 用 Google 账号登录，Dashboard 顶部就是 API Key；
+      <b>DeepSeek</b> → platform.deepseek.com → API Keys → 创建（充值几元即可）。填完点「保存到 .env」，再点「联网实测」验证真的通。</div>
+    <div style="margin-top:9px"><button class="primary" id="b-goto">去填写</button></div>
+  </div>`;
+  $("#b-goto").onclick = ()=>gotoConfig(s.keys.search ? "LLM_API_KEY" : "SERPER_API_KEY");
+}
+
+function renderTimer(s){
+  const box = $("#timerBox");
+  if (!s.packaged) return;
+  box.innerHTML = `
+    <div class="kvsub" style="margin:0 0 10px;font-size:11.5px">
+      本程序已内置定时器：<b>这个窗口开着就会自动跑</b>——每天 09:30 每日采集、10:00 获客流水线。关掉黑色窗口即停止。
+    </div>
+    <div class="hint">开机自启：按 Win+R 输入 <code>shell:startup</code> 回车，把桌面上的 <b>LeadRadar获客雷达.exe</b> 快捷方式拖进去即可。</div>`;
+}
+
+async function loadStatus(){
+  const s = await api("/api/status");
+  LAST = s;
+  const p = [];
+  p.push(pill(s.keys.search?"on":"off","搜索", s.keys.search ? s.keys.searchProvider : "未配置，去填", !s.keys.search && "SERPER_API_KEY"));
+  p.push(pill(s.keys.llm?"on":"off","大模型", s.keys.llm ? s.keys.llmModel : "未配置，去填", !s.keys.llm && "LLM_API_KEY"));
+  p.push(pill(s.chrome?"on":"bad","Chrome", s.chrome?"就绪":"缺失"));
+  p.push(pill(s.proxy?"on":"off","代理", s.proxy?s.proxy.replace(/^https?:\/\//,""):"未配置"));
+  $("#pills").innerHTML = p.join("");
+  document.querySelectorAll("[data-goto]").forEach(el=>el.onclick=()=>gotoConfig(el.dataset.goto));
+  renderBanner(s);
+  $("#proxyNow").textContent = "当前生效：" + (s.proxy || "无（官网可抓，Instagram / TikTok 大概率不通）");
+
+  const pipe = s.schedules.find(x=>x.key==="pipeline"), daily = s.schedules.find(x=>x.key==="daily");
+  if(pipe){ $("#s1").textContent = pipe.nextText; $("#s1s").textContent = `每天 ${pipe.time} · ${ago(pipe.nextInMs)}${pipe.enabled?"":" · 已停用"}`; }
+  if(daily){ $("#s2").textContent = daily.nextText; $("#s2s").textContent = `每天 ${daily.time} · ${ago(daily.nextInMs)}${daily.enabled?"":" · 已停用"}`; }
+  const src = s.sources || {};
+  $("#s3").textContent = (src.instagram||0)+(src.tiktok||0)+(src.website||0) + " 个";
+  $("#s3s").textContent = `IG ${src.instagram||0} · TikTok ${src.tiktok||0} · 官网 ${src.website||0}`;
+
+  renderReports(s.reports || []);
+  renderTimer(s);
+  if(s.job) syncJob(s.job);
+}
+
+function renderReports(list){
+  if(!list.length){ $("#repList").innerHTML = '<div style="padding:6px 0">还没有报告。跑一次获客或每日采集就会出现在这里。</div>'; return; }
+  $("#repList").innerHTML = list.map(r=>`
+    <div class="rep">
+      <span class="tag">${r.kind}</span>
+      <span class="date">${r.date}</span>
+      <span class="time">${new Date(r.mtime).toLocaleTimeString("zh-CN",{hour12:false})}${r.shots?` · ${r.shots} 张截图`:""}</span>
+      <span class="sp"></span>
+      <a href="#" data-view="${r.rel}">预览</a>
+      <a href="/view?p=${encodeURIComponent(r.rel)}" target="_blank" rel="noopener">新窗口 ↗</a>
+    </div>`).join("");
+  document.querySelectorAll("[data-view]").forEach(a=>a.onclick=(e)=>{
+    e.preventDefault();
+    $("#previewWrap").style.display="block";
+    $("#previewName").textContent = "预览：" + a.dataset.view;
+    $("#preview").src = "/view?p=" + encodeURIComponent(a.dataset.view);
+    $("#previewWrap").scrollIntoView({behavior:"smooth",block:"start"});
+  });
+}
+
+function setRunning(on, label){
+  ["b-pipeline","b-daily","b-doctor","b-live","b-next"].forEach(id=>{ $("#"+id).disabled = on; });
+  $("#b-stop").disabled = !on;
+  if(on){ $("#ldot").className="dot run"; $("#lstate").textContent = label || "运行中"; }
+}
+
+async function run(kind, label){
+  try{
+    const r = await api("/api/run", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({kind}) });
+    if(!r.ok){ toast(r.error || "启动失败"); return; }
+    curJob = r.id; lastLines = 0;
+    $("#log").innerHTML = "";
+    setRunning(true, label);
+    poll();
+  }catch(e){ toast("请求失败：" + e.message); }
+}
+
+function poll(){
+  clearTimeout(pollTimer);
+  pollTimer = setTimeout(async ()=>{
+    const j = await api("/api/job?id=" + curJob);
+    syncJob(j);
+    if(j.status === "running") poll();
+    else { setRunning(false); loadStatus(); }
+  }, 900);
+}
+
+function syncJob(j){
+  curJob = j.id;
+  if(j.lines && j.lines.length > lastLines){
+    const box = $("#log");
+    const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 60;
+    const html = j.lines.slice(lastLines).map(l=>`<div>${esc(l)}</div>`).join("");
+    if(lastLines === 0) box.innerHTML = html; else box.insertAdjacentHTML("beforeend", html);
+    lastLines = j.lines.length;
+    if(nearBottom) box.scrollTop = box.scrollHeight;
+  } else if(lastLines === 0 && j.status === "running"){
+    $("#log").innerHTML = '<span class="l0">已启动，等待第一条输出……</span>';
+  }
+  $("#ldot").className = "dot " + (j.status === "running" ? "run" : j.status === "done" ? "done" : j.status === "failed" ? "failed" : "");
+  $("#lstate").textContent = {running:"运行中：" + (j.label||""), done:"已完成：" + (j.label||""), failed:"失败：" + (j.label||""), stopped:"已停止", idle:"空闲"}[j.status] || j.status;
+  if(j.startedAt && j.endedAt) $("#ltime").textContent = ((j.endedAt - j.startedAt)/1000).toFixed(0) + "s";
+}
+
+/** 打开页面时接上「正在跑 / 刚跑完」的任务，避免日志区空着 */
+async function attachJob(){
+  const j = await api("/api/job");
+  if(!j || !j.id) return;
+  curJob = j.id; lastLines = 0;
+  syncJob(j);
+  if(j.status === "running"){ setRunning(true, j.label); poll(); }
+}
+
+const esc = (s)=>String(s==null?"":s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+
+async function loadEnv(){
+  const e = await api("/api/env");
+  document.querySelectorAll("[data-key]").forEach(el=>{
+    const k = el.dataset.key, v = e[k] || "";
+    if(el.tagName === "SELECT"){ el.value = v || "serper"; return; }
+    el.value = "";
+    if(v) el.placeholder = v + "（已设置，留空不修改）";
+  });
+}
+
+/* ---------------- 检索词 ---------------- */
+const TERM_LABELS = { product_terms: "产品词（我方 SKU）", country_terms: "国家词", buyer_terms: "买家类型词" };
+const KEY_LABELS = {
+  compression_tights: "压缩裤", running_singlet: "跑步背心", running_shorts: "跑步短裤", quick_dry: "速干衣", tight_pants: "紧身裤",
+  KR: "韩国", TH: "泰国", US: "美国", UK: "英国", ID: "印尼", MY: "马来西亚",
+  brand: "自有品牌", distributor: "分销/代理", retail: "专业零售", event: "赛事/跑团"
+};
+
+async function loadQueries(){
+  const q = await api("/api/queries");
+  $("#qTemplates").value = (q.terms.query_templates || []).join("\n");
+  $("#qCustom").value = (q.terms.custom_queries || []).join("\n");
+  $("#qMode").value = q.terms.custom_mode || "append";
+  $("#qMax").value = q.terms.max_queries_per_run || 30;
+
+  $("#qTerms").innerHTML = ["product_terms","country_terms","buyer_terms"].map(k=>{
+    const map = q.terms[k] || {};
+    return `<div style="margin-bottom:12px">
+      <div class="kvsub" style="margin:0 0 5px">${TERM_LABELS[k]}</div>
+      ${Object.entries(map).map(([kk,vv])=>`<div class="row"><label>${KEY_LABELS[kk]||kk}</label>
+        <input data-term="${k}" data-key="${kk}" value="${esc(vv)}" spellcheck="false"></div>`).join("")}
+    </div>`;
+  }).join("");
+
+  renderQueryPreview(q);
+}
+
+function renderQueryPreview(q){
+  const cut = q.generated > q.count;
+  $("#qSummary").innerHTML = `当前生效 <b>${q.count}</b> 条检索式${q.custom ? `（含自定义 ${q.custom} 条）` : ""}`
+    + (cut ? `　·　共生成 ${q.generated} 条，按上限截断 ${q.generated - q.count} 条` : "");
+  const list = (q.preview || []).slice(0, 8);
+  $("#qPreview").innerHTML = list.length
+    ? "预览（前 " + list.length + " 条）：<br>" + list.map(x => `<code>${esc(x.q)}</code>`).join(" ")
+    : "还没有可用的检索式——模板可能被清空了。";
+}
+
+async function saveQueries(reset){
+  const body = { reset: !!reset };
+  if(!reset){
+    body.query_templates = $("#qTemplates").value.split("\n").map(s=>s.trim()).filter(Boolean);
+    body.custom_queries = $("#qCustom").value.split("\n").map(s=>s.trim()).filter(Boolean);
+    body.custom_mode = $("#qMode").value;
+    body.max_queries_per_run = +$("#qMax").value || 30;
+    ["product_terms","country_terms","buyer_terms"].forEach(k=>{
+      body[k] = {};
+      document.querySelectorAll(`[data-term="${k}"]`).forEach(el=>{ body[k][el.dataset.key] = el.value.trim(); });
+    });
+  }
+  const r = await api("/api/queries", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body) });
+  if(r.ok){
+    toast(reset ? "已恢复默认检索词" : `已保存 · ${r.count} 条 · 下一轮生效`);
+    await loadQueries();
+  } else toast("保存失败");
+}
+
+$("#b-pipeline").onclick = ()=>run("pipeline","获客流水线");
+$("#b-daily").onclick = ()=>run("daily","每日采集");
+$("#b-doctor").onclick = ()=>run("doctor","环境体检");
+$("#b-live").onclick = ()=>run("doctorLive","联网实测");
+$("#b-next").onclick = ()=>run("next","下次运行时间");
+$("#b-stop").onclick = async ()=>{ await api("/api/stop",{method:"POST"}); toast("已请求停止"); };
+$("#b-reload").onclick = ()=>{ loadEnv(); loadStatus(); toast("已刷新"); };
+$("#b-save").onclick = async ()=>{
+  const body = {};
+  document.querySelectorAll("[data-key]").forEach(el=> body[el.dataset.key] = el.value.trim());
+  const r = await api("/api/env", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body) });
+  toast(r.applied && r.applied.length ? "已写入：" + r.applied.join(", ") : "没有需要写入的字段");
+  loadEnv(); loadStatus();
+};
+$("#b-qsave").onclick = ()=>saveQueries(false);
+$("#b-qreset").onclick = ()=>{ if(confirm("恢复默认检索词？当前自定义的词表会被清空。")) saveQueries(true); };
+
+document.querySelectorAll("[data-copy]").forEach(b=>b.onclick=async ()=>{
+  const el = $("#" + b.dataset.copy);
+  try{ await navigator.clipboard.writeText(el.value); toast("已复制：" + el.value); }
+  catch{ el.select(); document.execCommand("copy"); toast("已复制"); }
+});
+
+(async ()=>{
+  await loadStatus();
+  await loadEnv();
+  await loadQueries();
+  attachJob();
+  // EXE 首次启动带 #setup：缺 key 就直接滚到配置区，别让用户自己找
+  const missing = LAST && (!LAST.keys.search || !LAST.keys.llm);
+  if (location.hash === "#setup" && missing) {
+    setTimeout(()=>gotoConfig(LAST.keys.search ? "LLM_API_KEY" : "SERPER_API_KEY"), 350);
+  }
+})();
+setInterval(()=>{ if(!curJob || $("#ldot").className.indexOf("run")<0) loadStatus(); }, 20000);
+</script>
+</body>
+</html>
