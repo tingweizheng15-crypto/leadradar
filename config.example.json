@@ -49,6 +49,11 @@
   "scoring": {
     "min_score": 60
   },
+  "dedupe": {
+    "enabled": true,
+    "ttl_days": 14,
+    "min_new_per_run": 6
+  },
   "report": {
     "out_dir": "out",
     "open_after_run": false,

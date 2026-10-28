@@ -52,9 +52,12 @@ const merge = (base, over) => {
 };
 
 /**
+ * @param {object} cfg
+ * @param {{full?: boolean}} [opts] full=true 时返回未截断的完整列表，
+ *        供 allocateQueries 和社媒检索式一起做预算分配
  * @returns {{queries: Array, generated: number, truncated: number, templates: string[], custom: number, mode: string}}
  */
-export function buildQueries(cfg) {
+export function buildQueries(cfg, { full = false } = {}) {
   const s = cfg.search || {};
   const productTerms = merge(PRODUCT_TERMS, s.product_terms);
   const countryTerms = merge(COUNTRY_TERMS, s.country_terms);
@@ -115,7 +118,7 @@ export function buildQueries(cfg) {
   if (!list.length) list = built; // replace 但没写自定义时，别把流程跑空
 
   const max = Math.min(200, Math.max(1, Number(s.max_queries_per_run) || 30));
-  const queries = list.slice(0, max);
+  const queries = full ? list.slice() : list.slice(0, max);
 
   return {
     queries,
@@ -124,6 +127,50 @@ export function buildQueries(cfg) {
     templates,
     custom: customList.length,
     mode,
+  };
+}
+
+/**
+ * 把「主体检索式」和「社媒检索式」按预算分配后交错排列。
+ *
+ * 之前的问题：主体自己就吃满了 max，社媒 24 条追加在后面被整体截断，
+ * 实际一条社媒检索都没跑——所以报告里从来没有 Instagram / TikTok 出来的线索。
+ *
+ * 规则：社媒占 socialRatio（默认 25%，至少 3 条），剩下给主体；
+ * 排列上每 3 条主体插 1 条社媒，避免社媒全部挤在末尾。
+ *
+ * 比例之所以不设太高：实测 Google 对 site:instagram.com 几乎只返回帖子页
+ * （URL 里没有用户名，抓不出品牌），而 site:tiktok.com 的视频页还能提到 @账号。
+ * 所以社媒检索是"补充"，主力仍是主体检索 + 官网反查社媒。
+ */
+export function allocateQueries(bodyList, socialList, max, { socialRatio = 0.25 } = {}) {
+  const budget = Math.max(1, Number(max) || 30);
+  const bodies = Array.isArray(bodyList) ? bodyList : [];
+  const socials = Array.isArray(socialList) ? socialList : [];
+  const ratio = Number(socialRatio) >= 0 && Number(socialRatio) <= 1 ? Number(socialRatio) : 0.25;
+
+  const socialCap = socials.length
+    ? Math.min(socials.length, Math.max(3, Math.round(budget * ratio)))
+    : 0;
+  const bodyCap = Math.max(0, budget - socialCap);
+
+  const body = bodies.slice(0, bodyCap);
+  const social = socials.slice(0, socialCap);
+
+  const out = [];
+  let bi = 0, si = 0;
+  while (bi < body.length || si < social.length) {
+    for (let k = 0; k < 3 && bi < body.length; k++) out.push(body[bi++]);
+    if (si < social.length) out.push(social[si++]);
+  }
+
+  return {
+    queries: out,
+    budget,
+    bodyCount: body.length,
+    socialCount: social.length,
+    bodyTotal: bodies.length,
+    socialTotal: socials.length,
   };
 }
 

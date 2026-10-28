@@ -405,8 +405,14 @@ async function loadQueries(){
 
 function renderQueryPreview(q){
   const cut = q.generated > q.count;
+  const split = (q.bodyCount != null && q.socialTotal != null)
+    ? `　·　<b>主体 ${q.bodyCount}</b> 条 + <b>社媒 ${q.socialCount}</b> 条`
+      + (q.socialTotal > q.socialCount ? `（社媒共 ${q.socialTotal} 条，超出预算）` : "")
+    : "";
   $("#qSummary").innerHTML = `当前生效 <b>${q.count}</b> 条检索式${q.custom ? `（含自定义 ${q.custom} 条）` : ""}`
-    + (cut ? `　·　共生成 ${q.generated} 条，按上限截断 ${q.generated - q.count} 条` : "");
+    + split
+    + (cut ? `　·　共生成 ${q.generated} 条，截断 ${q.generated - q.count} 条` : "")
+    + (q.seen ? `<br><span style="color:var(--ink3)">已记住 ${q.seen} 个见过域名，下轮优先找新的</span>` : "");
   const list = (q.preview || []).slice(0, 8);
   $("#qPreview").innerHTML = list.length
     ? "预览（前 " + list.length + " 条）：<br>" + list.map(x => `<code>${esc(x.q)}</code>`).join(" ")

@@ -298,6 +298,16 @@ const stats = {
   by_channel: results.reduce((a, r) => { a[r.channel] = (a[r.channel] || 0) + 1; return a; }, {}),
 };
 
+// 全部/大半抓不到时，「0 新增」是个假象——必须写在最显眼的位置，
+// 否则用户只会看到「今日新增 0」，以为品牌都没动静。
+const allFailed = stats.total > 0 && stats.errors === stats.total;
+const mostlyFailed = stats.errors > 0 && stats.errors >= Math.max(2, Math.ceil(stats.total * 0.5));
+const failNote = allFailed
+  ? `本轮 ${stats.total} 个来源**全部抓取失败**，所以「0 新增」不代表品牌没有变化。绝大多数情况是代理没开或网络断了（报错多为 dom not ready / Command failed）。请确认 Clash / v2ray 正在运行，然后在操作台点「每日采集」重跑一次。`
+  : mostlyFailed
+    ? `本轮 ${stats.errors}/${stats.total} 个来源抓取失败，结果不完整，0 新增不代表没有变化。检查代理后重跑。`
+    : "";
+
 fs.writeFileSync(path.join(outDir, "data.json"), JSON.stringify({ stats, results }, null, 2), "utf8");
 
 // ---------- CSV ----------
@@ -312,6 +322,7 @@ fs.writeFileSync(path.join(outDir, "leads.csv"), "\ufeff" + csv.join("\r\n"), "u
 const md = [];
 md.push(`# 获客日报 ${argDate}`, "");
 md.push(`生成时间：${isoCN()}　耗时：${stats.duration_s}s`, "");
+if (failNote) md.push("", `> ⚠️ **${failNote}**`, "");
 md.push(`- 观察名单：${stats.total} 个来源（IG ${stats.by_channel.instagram || 0} / TikTok ${stats.by_channel.tiktok || 0} / 官网 ${stats.by_channel.website || 0}）`);
 md.push(isBaseline ? `- 本次为基线建库：${stats.new_or_changed} 个来源首次纳入（不是「今天新增」，明天起按变化判定）` : `- 今日新增或变化：**${stats.new_or_changed}**`);
 md.push(`- 无变化：${stats.unchanged}　异常：${stats.errors}`, "");
@@ -381,10 +392,12 @@ h2{font-size:14px;margin:0 0 12px}
 .brief h3{margin:0 0 8px;font-size:13px;color:#fda4af}
 .brief li{font-size:12.5px;color:#e2e8f0;margin-bottom:5px}
 .foot{font-size:11px;color:var(--ink3);line-height:1.8;margin-top:8px}
+.failbox{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;border-radius:12px;padding:13px 16px;margin:0 0 16px;font-size:13px;line-height:1.7}
 @media(max-width:900px){.kpis{grid-template-columns:repeat(2,1fr)}.item{grid-template-columns:1fr}}
 </style></head><body><div class="wrap">
 <h1>获客日报 · ${argDate}</h1>
 <div class="sub">生成于 ${isoCN()}　·　观察名单 ${stats.total} 个公开来源　·　耗时 ${stats.duration_s}s${isBaseline ? "　·　<b>本次为基线建库</b>" : ""}</div>
+${failNote ? `<div class="failbox">⚠️ ${failNote}</div>` : ""}
 
 <div class="kpis">
   <div class="kpi hot"><div class="k">今日新增 / 变化</div><div class="v">${stats.new_or_changed}</div></div>
@@ -426,4 +439,5 @@ if (fs.existsSync(reportPath)) {
 fs.writeFileSync(reportPath, html, "utf8");
 
 console.log(`\n✔ ${argDate} 完成：新增/变化 ${stats.new_or_changed} / 新鲜 ${stats.fresh} / 无变化 ${stats.unchanged} / 异常 ${stats.errors}`);
+if (failNote) console.log(`\n⚠️  ${failNote}`);
 console.log(`  ${path.join(outDir, "report.html")}`);

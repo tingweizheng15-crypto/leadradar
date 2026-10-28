@@ -1,26 +1,50 @@
 import { fetchHtml, enrichSite, detectSignals } from "./enrich.mjs";
 import { resolveProxy } from "./net.mjs";
 
+// 这些是平台的功能路径，不是用户名。
+// Google 搜 site:instagram.com 时绝大多数结果都是 /p/ 和 /reel/ 帖子页，
+// 而帖子 URL 里根本不含用户名——拿 "p" 当 handle 去抓只会白跑一趟。
+const IG_RESERVED = new Set([
+  "p", "reel", "reels", "tv", "explore", "stories", "accounts", "about", "legal",
+  "directory", "challenge", "popular", "web", "api", "developer", "privacy", "terms",
+  "emojis", "creators", "business", "help", "press", "session", "oauth", "graphql",
+]);
+const FB_RESERVED = new Set([
+  "permalink.php", "story.php", "watch", "reel", "video.php", "groups", "events",
+  "pages", "profile.php", "sharer", "sharer.php", "login", "help", "policies", "business",
+]);
+
 export function parseSocialUrl(url) {
   try {
     const u = new URL(url);
     const h = u.hostname.replace(/^www\./, "").toLowerCase();
     let platform = "", handle = "";
-    if (/instagram\.com/.test(h)) {
+    if (/(^|\.)instagram\.com$/.test(h)) {
       platform = "instagram";
       const m = u.pathname.match(/^\/([a-zA-Z0-9_.]+)/);
-      handle = m ? m[1] : "";
-    } else if (/tiktok\.com/.test(h)) {
+      const name = m ? m[1] : "";
+      if (name && !IG_RESERVED.has(name.toLowerCase()) && /^[a-zA-Z0-9_.]{1,30}$/.test(name) && !/^\d+$/.test(name)) {
+        handle = name;
+      }
+    } else if (/(^|\.)tiktok\.com$/.test(h)) {
       platform = "tiktok";
+      // 视频页 /@user/video/123 里能提取到真正的账号，这是站点检索里唯一可靠的来源
       const m = u.pathname.match(/^\/@([a-zA-Z0-9_.]+)/);
       handle = m ? m[1] : "";
-    } else if (/facebook\.com/.test(h)) {
+    } else if (/(^|\.)facebook\.com$/.test(h)) {
       platform = "facebook";
       const m = u.pathname.match(/^\/([a-zA-Z0-9_.]+)/);
-      handle = m ? m[1] : "";
+      const name = m ? m[1] : "";
+      if (name && !FB_RESERVED.has(name.toLowerCase()) && !/^\d+$/.test(name)) handle = name;
     }
     return { platform, handle };
   } catch { return { platform: "", handle: "" }; }
+}
+
+/** 是不是一个能抓的「品牌主页」——帖子页、话题页一律算否 */
+export function isProfileUrl(url) {
+  const { platform, handle } = parseSocialUrl(url);
+  return !!(platform && handle);
 }
 
 export function isSocialUrl(url) {

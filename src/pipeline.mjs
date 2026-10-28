@@ -6,7 +6,8 @@ import { enrichSite, domainOf } from "./enrich.mjs";
 import { scoreLead, dedupeByDomain, recompute, TYPES } from "./score.mjs";
 import { analyzeLead } from "./llm.mjs";
 import { enrichSocial, isSocialUrl, buildSocialQueries, parseSocialUrl } from "./social.mjs";
-import { buildQueries } from "./query.mjs";
+import { buildQueries, allocateQueries } from "./query.mjs";
+import { splitSeen, markSeen } from "./store.mjs";
 import { writeReport, notify, ymd } from "./report.mjs";
 
 export { buildQueries };
@@ -76,21 +77,35 @@ export async function discover(cfg) {
     const candidates = [];
     const seen = new Set();
     const failures = [];
-    const plan = buildQueries(cfg);
-    const queries = plan.queries.slice();
-    if (cfg.search.include_social !== false) queries.push(...buildSocialQueries(cfg));
-    // 全局截断：社媒检索式也是要花钱的 API 调用，必须一起吃进预算
-    const max = cfg.search.max_queries_per_run || 30;
-    const planned = queries.slice(0, max);
-    if (queries.length > planned.length) {
-      console.log(`  [预算] 检索式 ${plan.generated} 条${plan.custom ? `（含自定义 ${plan.custom} 条）` : ""} + 社媒 ${queries.length - plan.queries.length} 条，按 max_queries_per_run=${max} 截断到 ${planned.length} 条`);
+    let socialSkipped = 0;
+    const plan = buildQueries(cfg, { full: true });
+    const social = cfg.search.include_social !== false ? buildSocialQueries(cfg) : [];
+    // 预算按比例分配：主体拿 70%，社媒保底 30%，再交错排列
+    // （原来主体先吃满上限，社媒追加后整体被截断，等于一条社媒检索都没跑）
+    const alloc = allocateQueries(plan.queries, social, cfg.search.max_queries_per_run || 30, {
+      socialRatio: cfg.search.social_ratio,
+    });
+    const planned = alloc.queries;
+    if (alloc.bodyTotal > alloc.bodyCount || alloc.socialTotal > alloc.socialCount) {
+      console.log(`  [预算] 生成 ${alloc.bodyTotal} 条主体${plan.custom ? `（含自定义 ${plan.custom} 条）` : ""} + ${alloc.socialTotal} 条社媒 → 按上限 ${alloc.budget} 跑 ${alloc.bodyCount} + ${alloc.socialCount} 条`);
+    } else {
+      console.log(`  [预算] 主体 ${alloc.bodyCount} + 社媒 ${alloc.socialCount}，共 ${planned.length} 条`);
     }
     for (const q of planned) {
       try {
-        const results = await search(cfg, q.q, cfg.search.results_per_query);
+        const results = await search(cfg, q.q, cfg.search.results_per_query, { country: q.country });
         for (const r of results || []) {
           if (isNoiseUrl(r.url)) continue;
-          const dom = isSocialUrl(r.url) ? `${parseSocialUrl(r.url).platform}:${parseSocialUrl(r.url).handle}` : domainOf(r.url);
+          let dom;
+          if (isSocialUrl(r.url)) {
+            const sp = parseSocialUrl(r.url);
+            // 帖子页（instagram.com/p/…、/reel/…）里没有用户名，抓不出任何东西，
+            // 直接跳过，别浪费一次 8 秒的抓取
+            if (!sp.platform || !sp.handle) { socialSkipped++; continue; }
+            dom = `${sp.platform}:${sp.handle}`;
+          } else {
+            dom = domainOf(r.url);
+          }
           if (!dom || seen.has(dom)) continue;
           seen.add(dom);
           const tld = tldCountry(r.url);
@@ -109,7 +124,8 @@ export async function discover(cfg) {
       }
       await new Promise((r) => setTimeout(r, 120));
     }
-    return { candidates, source: providerName(cfg), search: true, queries: planned.length, failed: failures.length, failures };
+    if (socialSkipped) console.log(`  [社媒] 跳过 ${socialSkipped} 个帖子页（URL 里没有用户名，抓不出品牌信息）`);
+    return { candidates, source: providerName(cfg), search: true, queries: planned.length, failed: failures.length, failures, socialSkipped, socialQueries: alloc.socialCount };
   }
   const seeds = seedLeads(cfg);
   return { candidates: seeds, source: "本地样本库（未配置搜索 key，仅官网/社媒公开信息）", search: false, queries: 0, failed: 0, failures: [] };
@@ -125,13 +141,37 @@ export async function runPipeline(cfg, opts = {}) {
   if (!llmReady(cfg)) warnings.push("未配置大模型 key：当前为规则评分，无 AI 判断与开发信草稿。填 LLM_API_KEY 后自动启用。");
 
   const d = await discover(cfg);
-  const { candidates, source } = d;
+  let candidates = d.candidates;
+  const { source } = d;
   if (d.failed && d.queries && d.failed >= d.queries) {
     warnings.push(`搜索 ${d.failed}/${d.queries} 条全部失败：报告为空不代表没有客户，先检查 API key / 余额 / 代理。首条错误：${d.failures[0]}`);
   } else if (d.failed) {
     warnings.push(`搜索 ${d.failed}/${d.queries} 条失败（少部分查询被跳过，结果可能不全）：${d.failures.slice(0, 3).join("；")}`);
   }
   if (d.search && !candidates.length) warnings.push("搜索已就绪但 0 条候选：多为检索式太窄或结果被噪声域名过滤，建议放宽市场/商品组合。");
+
+  // 跨天去重：优先跑没见过的域名，新域名不够时才用回访补位
+  const dd = cfg.dedupe || {};
+  const dedupeOn = dd.enabled !== false && d.search;
+  const ttl = Number(dd.ttl_days) > 0 ? Number(dd.ttl_days) : 14;
+  const minNew = Number(dd.min_new_per_run) > 0 ? Number(dd.min_new_per_run) : 6;
+  let newCount = candidates.length;
+  let revisitCount = 0;
+  if (dedupeOn && candidates.length) {
+    const { fresh, revisit } = splitSeen(candidates, ttl);
+    newCount = fresh.length;
+    revisitCount = revisit.length;
+    const picked = fresh.slice();
+    if (picked.length < minNew) {
+      const need = Math.min(revisit.length, minNew - picked.length);
+      for (const r of revisit.slice(0, need)) picked.push({ ...r, revisit: true });
+    }
+    console.log(`  [去重] 本轮候选 ${candidates.length} 个：全新 ${fresh.length} / ${ttl} 天内见过 ${revisit.length} → 实际抓取 ${picked.length} 个`);
+    if (!fresh.length && revisit.length) {
+      warnings.push(`本轮没有发现新域名（${revisit.length} 个都是近 ${ttl} 天见过的）。说明当前检索式已把结果挖完，建议在「检索词」里加新的国家/产品组合或本地语检索式。`);
+    }
+    candidates = picked;
+  }
   const max = cfg.report.max_candidates_per_run;
   const leads = [];
 
@@ -166,6 +206,10 @@ export async function runPipeline(cfg, opts = {}) {
         snippet: c.snippet || "",
         fetched_at: new Date(Date.now() + 8 * 3600e3).toISOString().replace("Z", "+08:00"),
       };
+      if (c.revisit) {
+        lead.revisit = true;
+        lead.last_seen = c.lastSeen || "";
+      }
       scoreLead(lead, cfg);
 
       if (llmReady(cfg)) {
@@ -192,7 +236,8 @@ export async function runPipeline(cfg, opts = {}) {
       }
 
       leads.push(lead);
-      console.log(`  [${lead.total}] ${lead.name}　邮箱${lead.emails.length} 电话${lead.phones.length} 社媒${lead.social.length}${lead.draft ? "　AI✓" : ""}`);
+      const tag = lead.revisit ? "回访" : "新";
+      console.log(`  [${lead.total}] ${lead.name}　${tag}　邮箱${lead.emails.length} 电话${lead.phones.length} 社媒${lead.social.length}${lead.draft ? "　AI✓" : ""}`);
     } catch (e) {
       warnings.push(`${c.name || c.url}：抓取失败 ${String(e.message || e).slice(0, 80)}`);
     }
@@ -202,6 +247,9 @@ export async function runPipeline(cfg, opts = {}) {
   const deduped = dedupeByDomain(leads);
   const kept = deduped.filter((l) => l.total >= (cfg.scoring.min_score ?? 60));
   kept.sort((a, b) => b.total - a.total);
+
+  // 记下这轮真正抓过的域名，下一次运行就能识别「今天是不是新面孔」
+  if (dedupeOn) markSeen(candidates.map((c) => c.domain), { ttlDays: ttl });
 
   if (aiFailures.length) {
     warnings.push(`大模型 ${aiFailures.length} 条调用失败，本次没有 AI 判断与开发信。首条原因：${aiFailures[0]}`);
@@ -217,6 +265,9 @@ export async function runPipeline(cfg, opts = {}) {
     search_failed: d.failed || 0,
     email_finder: emailFinder,
     candidates: candidates.length,
+    new_domains: newCount,
+    revisit_domains: kept.filter((l) => l.revisit).length,
+    dedupe_ttl: dedupeOn ? ttl : 0,
     leads: kept.length,
     qualified: kept.filter((l) => l.status === "qualified").length,
     review: kept.filter((l) => l.status === "review").length,

@@ -37,11 +37,14 @@ export function writeReport({ stats, leads, cfg, warnings }) {
   md.push(`- 数据源：${stats.source}　搜索就绪：${stats.search_ready ? "是" : "否"}　邮箱查找：${stats.email_finder}`, "");
   if (stats.search_ready) md.push(`- 本轮检索：${stats.search_queries} 条（失败 ${stats.search_failed || 0} 条）`, "");
   md.push(`- 发现候选：${stats.candidates}　有效线索：${stats.leads}　合格(≥80)：${stats.qualified}　待复核：${stats.review}`, "");
+  if (stats.search_ready && stats.dedupe_ttl) {
+    md.push(`- 今日新发现：${stats.new_domains ?? "-"} 个域名　·　近 ${stats.dedupe_ttl} 天见过的回访：${stats.revisit_domains ?? 0} 条（回访只在当天没有新面孔时兜底补位）`, "");
+  }
   if (warnings?.length) { md.push("", "## 警告", ""); for (const w of warnings) md.push(`- ${w}`); }
   md.push("", "## 客户线索", "");
-  md.push("| 公司 | 国家 | 类型 | 评分 | 状态 | 邮箱 | 电话 | 社媒 | 官网 |", "|---|---|---|---|---|---|---|---|---|");
+  md.push("| 公司 | 国家 | 类型 | 评分 | 状态 | 新/回访 | 邮箱 | 电话 | 社媒 | 官网 |", "|---|---|---|---|---|---|---|---|---|---|");
   for (const l of leads) {
-    md.push(`| ${l.name} | ${COUNTRIES[l.country] || l.country} | ${l.typeLabel || ""} | ${l.total} | ${statusLabel(l.status)} | ${fmtEmails(l.emails)} | ${fmtContacts(l.phones)} | ${(l.social || []).map((s) => `${s.platform}:${s.handle}`).join("、") || "—"} | ${l.url || "—"} |`);
+    md.push(`| ${l.name} | ${COUNTRIES[l.country] || l.country} | ${l.typeLabel || ""} | ${l.total} | ${statusLabel(l.status)} | ${l.revisit ? "回访" : "新"} | ${fmtEmails(l.emails)} | ${fmtContacts(l.phones)} | ${(l.social || []).map((s) => `${s.platform}:${s.handle}`).join("、") || "—"} | ${l.url || "—"} |`);
   }
   const drafts = leads.filter((l) => l.draft);
   if (drafts.length) {
@@ -76,6 +79,7 @@ function renderHtml({ stats, leads, warnings, date }) {
       <td>${(l.overlap || []).map((p) => `<span class="tag">${esc(PRODUCTS[p] || p)}</span>`).join("")}</td>
       <td style="color:${sc};font-weight:700">${l.total}</td>
       <td>${statusLabel(l.status)}</td>
+      <td>${l.revisit ? `<span class="tag dim">回访</span>` : `<span class="tag new">新</span>`}</td>
       <td class="mono">${esc(fmtEmails(l.emails))}</td>
       <td class="mono">${esc(fmtContacts(l.phones))}</td>
       <td>${(l.social || []).map((s) => `<span class="tag">${esc(s.platform)}:${esc(s.handle)}</span>`).join("") || "—"}</td>
@@ -101,7 +105,7 @@ function renderHtml({ stats, leads, warnings, date }) {
 .card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:16px;overflow-x:auto}
 h2{font-size:14px;margin:0 0 12px}table{width:100%;border-collapse:collapse;font-size:12px}
 th,td{text-align:left;padding:8px 10px;border-bottom:1px solid #f1f4f8;vertical-align:top}th{color:var(--ink3);font-size:11px;font-weight:600;white-space:nowrap}
-.tag{display:inline-block;background:#f1f5f9;border-radius:5px;padding:1px 6px;font-size:10.5px;margin:1px 3px 1px 0}.mono{font-family:ui-monospace,Menlo,monospace;font-size:11px}
+.tag{display:inline-block;background:#f1f5f9;border-radius:5px;padding:1px 6px;font-size:10.5px;margin:1px 3px 1px 0}.tag.new{background:#dcfce7;color:#15803d;font-weight:600}.tag.dim{background:#f1f5f9;color:#94a3b8}.mono{font-family:ui-monospace,Menlo,monospace;font-size:11px}
 a{color:#be123c;text-decoration:none}.foot{font-size:11px;color:var(--ink3);line-height:1.8;margin-top:8px}
 .draft{padding:12px 0;border-bottom:1px solid #f1f4f8}.draft:last-child{border-bottom:none}
 .d-top{display:flex;align-items:center;gap:8px;margin-bottom:4px}.d-top b{font-size:13px}.lang{font-size:10px;background:#0f172a;color:#fff;padding:1px 7px;border-radius:4px}
@@ -113,7 +117,7 @@ a{color:#be123c;text-decoration:none}.foot{font-size:11px;color:var(--ink3);line
 <div class="sub">生成于 ${isoCN()}　·　耗时 ${stats.duration_s}s　·　数据源 ${esc(stats.source)}　·　搜索就绪 ${stats.search_ready ? "是" : "否"}${stats.search_ready ? `　·　检索 ${stats.search_queries} 条（失败 ${stats.search_failed || 0}）` : ""}　·　邮箱查找 ${esc(stats.email_finder)}</div>
 <div class="kpis">
 <div class="kpi hot"><div class="k">有效线索</div><div class="v">${stats.leads}</div></div>
-<div class="kpi"><div class="k">发现候选</div><div class="v">${stats.candidates}</div></div>
+<div class="kpi"><div class="k">发现候选</div><div class="v">${stats.candidates}</div>${stats.dedupe_ttl ? `<div class="ks">新域名 ${stats.new_domains ?? "-"}</div>` : ""}</div>
 <div class="kpi"><div class="k">合格(≥80)</div><div class="v">${stats.qualified}</div></div>
 <div class="kpi"><div class="k">待复核</div><div class="v">${stats.review}</div></div>
 <div class="kpi"><div class="k">有邮箱</div><div class="v">${stats.with_email}</div><div class="ks">入选线索中</div></div>
@@ -121,7 +125,7 @@ a{color:#be123c;text-decoration:none}.foot{font-size:11px;color:var(--ink3);line
 </div>
 ${warn}
 <div class="card"><h2>客户线索（${leads.length}）</h2>
-<table><thead><tr><th>公司</th><th>国家</th><th>类型</th><th>商品</th><th>评分</th><th>状态</th><th>邮箱</th><th>电话</th><th>社媒</th><th>官网</th></tr></thead><tbody>${rows || `<tr><td colspan="10" style="color:#94a3b8">暂无线索</td></tr>`}</tbody></table>
+<table><thead><tr><th>公司</th><th>国家</th><th>类型</th><th>商品</th><th>评分</th><th>状态</th><th>新/回访</th><th>邮箱</th><th>电话</th><th>社媒</th><th>官网</th></tr></thead><tbody>${rows || `<tr><td colspan="11" style="color:#94a3b8">暂无线索</td></tr>`}</tbody></table>
 </div>
 ${draftsHtml}
 <div class="foot">邮箱标注：(官方)=来自客户官网/公开页面，可信；(候选)=来自邮箱查找服务推测，发信前需验证。开发信草稿由大模型生成，仅供参考，发送前请人工确认。本报告只做信息采集与判断，不自动发送任何消息。</div>

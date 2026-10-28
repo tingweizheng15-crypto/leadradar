@@ -14,7 +14,19 @@ import { providerName } from "../src/search.mjs";
 import { findChrome } from "../src/enrich.mjs";
 import { jobsOf, parseHms, nextRunEpoch, fmt } from "../src/schedule.mjs";
 import { jobCommand, IS_SEA } from "../src/runner.mjs";
-import { buildQueries, effectiveTerms, DEFAULTS } from "../src/query.mjs";
+import { buildQueries, allocateQueries, effectiveTerms, DEFAULTS } from "../src/query.mjs";
+import { buildSocialQueries } from "../src/social.mjs";
+import { seenStats } from "../src/store.mjs";
+
+/** 操作台预览要用和流水线完全一致的预算分配，否则显示的条数是假的 */
+function queryPlan(cfg) {
+  const plan = buildQueries(cfg, { full: true });
+  const social = cfg.search.include_social !== false ? buildSocialQueries(cfg) : [];
+  const alloc = allocateQueries(plan.queries, social, cfg.search.max_queries_per_run || 30, {
+    socialRatio: cfg.search.social_ratio,
+  });
+  return { plan, alloc };
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const HOST = "127.0.0.1";
@@ -290,16 +302,22 @@ const server = http.createServer(async (req, res) => {
 
     if (url.pathname === "/api/queries" && req.method === "GET") {
       const cfg = loadConfig();
-      const plan = buildQueries(cfg);
+      const { plan, alloc } = queryPlan(cfg);
       return send(res, 200, "application/json", JSON.stringify({
         terms: effectiveTerms(cfg),
         defaults: DEFAULTS,
-        preview: plan.queries.slice(0, 15),
-        count: plan.queries.length,
-        generated: plan.generated,
-        truncated: plan.truncated,
+        preview: alloc.queries.slice(0, 15),
+        count: alloc.queries.length,
+        generated: alloc.bodyTotal + alloc.socialTotal,
+        truncated: Math.max(0, alloc.bodyTotal + alloc.socialTotal - alloc.queries.length),
         custom: plan.custom,
         mode: plan.mode,
+        budget: alloc.budget,
+        bodyCount: alloc.bodyCount,
+        socialCount: alloc.socialCount,
+        bodyTotal: alloc.bodyTotal,
+        socialTotal: alloc.socialTotal,
+        seen: seenStats().total,
       }));
     }
 
@@ -308,16 +326,22 @@ const server = http.createServer(async (req, res) => {
       if (body.reset === true) saveQueries({}, true);
       else saveQueries(normalizeQueriesPatch(body));
       const cfg = loadConfig();
-      const plan = buildQueries(cfg);
+      const { plan, alloc } = queryPlan(cfg);
       return send(res, 200, "application/json", JSON.stringify({
         ok: true,
         terms: effectiveTerms(cfg),
-        preview: plan.queries.slice(0, 15),
-        count: plan.queries.length,
-        generated: plan.generated,
-        truncated: plan.truncated,
+        preview: alloc.queries.slice(0, 15),
+        count: alloc.queries.length,
+        generated: alloc.bodyTotal + alloc.socialTotal,
+        truncated: Math.max(0, alloc.bodyTotal + alloc.socialTotal - alloc.queries.length),
         custom: plan.custom,
         mode: plan.mode,
+        budget: alloc.budget,
+        bodyCount: alloc.bodyCount,
+        socialCount: alloc.socialCount,
+        bodyTotal: alloc.bodyTotal,
+        socialTotal: alloc.socialTotal,
+        seen: seenStats().total,
       }));
     }
 
