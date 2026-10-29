@@ -186,8 +186,13 @@ export function allocateQueries(bodyList, socialList, max, { socialRatio = 0.25 
   const socials = Array.isArray(socialList) ? socialList : [];
   const ratio = Number(socialRatio) >= 0 && Number(socialRatio) <= 1 ? Number(socialRatio) : 0.25;
 
+  // 社媒份额：按比例，但必须给主体留位置。
+  // 之前写死「至少 3 条」，预算只有 3 时会算出 主体 0 + 社媒 3，
+  // 而社媒检索在 Google 上几乎全返回帖子页（实测 72 条 0 个主页），等于白跑。
+  const share = Math.round(budget * ratio);
+  const floor = budget >= 10 ? 3 : 1;   // 小预算时不要把额度全给社媒
   const socialCap = socials.length
-    ? Math.min(socials.length, Math.max(3, Math.round(budget * ratio)))
+    ? Math.min(socials.length, Math.max(floor, Math.min(share, budget - 1)))
     : 0;
   const bodyCap = Math.max(0, budget - socialCap);
 

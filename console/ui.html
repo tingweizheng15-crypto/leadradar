@@ -113,6 +113,11 @@
       <button class="danger" id="b-stop" disabled>■ 停止当前任务</button>
     </div>
     <div class="hint" id="hint">获客流水线会真实发请求、真实调用大模型（如已配置 key）；每日采集需要 Chrome，会截图留证。</div>
+    <label style="display:flex;align-items:center;gap:7px;margin-top:8px;font-size:12px;color:var(--ink2);cursor:pointer">
+      <input type="checkbox" id="ignoreDedupe" style="width:auto;margin:0">
+      忽略跨天去重，重看全部
+      <span style="color:var(--ink3)">（只对这一次获客生效；报告里会出现大量之前见过的域名，用来验证「这批词到底能挖出多少」）</span>
+    </label>
   </div>
 
   <div class="card log" style="margin-bottom:14px">
@@ -388,11 +393,13 @@ async function run(kind, label){
     }
   }
   try{
-    const r = await api("/api/run", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({kind}) });
+    const ignoreDedupe = kind === "pipeline" && $("#ignoreDedupe")?.checked;
+    const r = await api("/api/run", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ kind, ignoreDedupe }) });
     if(!r.ok){ toast(r.error || "启动失败"); return; }
     curJob = r.id; lastLines = 0;
     $("#log").innerHTML = "";
-    setRunning(true, label);
+    setRunning(true, ignoreDedupe ? label + "（忽略去重）" : label);
+    if(ignoreDedupe) toast("本次忽略跨天去重：所有候选都会抓取，耗时会更长");
     poll();
   }catch(e){ toast("请求失败：" + e.message); }
 }

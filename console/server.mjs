@@ -60,7 +60,7 @@ function runningJob() {
   return null;
 }
 
-function startJob(kind) {
+function startJob(kind, opts = {}) {
   const def = KINDS[kind];
   if (!def) throw new Error("未知任务类型");
   const busy = runningJob();
@@ -68,17 +68,21 @@ function startJob(kind) {
 
   const id = ++jobSeq;
   const job = {
-    id, kind, label: def.label, status: "running",
+    id, kind, label: def.label + (opts.ignoreDedupe ? "（忽略去重）" : ""), status: "running",
     startedAt: Date.now(), endedAt: null, code: null, lines: [],
+    ignoreDedupe: !!opts.ignoreDedupe,
   };
   jobs.set(id, job);
   lastJobId = id;
   while (jobs.size > 20) jobs.delete([...jobs.keys()][0]);
 
+  const env = { ...process.env, FORCE_COLOR: "0", NO_COLOR: "1" };
+  // 只对本次任务生效，不写进配置：忘记关掉也不会让每天的定时任务天天重发老面孔
+  if (opts.ignoreDedupe) env.LR_IGNORE_DEDUPE = "1";
   const jc = jobCommand(kind);
   const child = spawn(jc.cmd, jc.args, {
     cwd: ROOT,
-    env: { ...process.env, FORCE_COLOR: "0", NO_COLOR: "1" },
+    env,
     windowsHide: true,
   });
   job.child = child;
@@ -473,7 +477,7 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === "/api/run" && req.method === "POST") {
       const body = JSON.parse((await readBody(req)) || "{}");
       try {
-        const job = startJob(body.kind);
+        const job = startJob(body.kind, { ignoreDedupe: !!body.ignoreDedupe });
         return send(res, 200, "application/json", JSON.stringify({ ok: true, id: job.id }));
       } catch (e) {
         return send(res, 409, "application/json", JSON.stringify({ ok: false, error: String(e.message || e) }));

@@ -152,12 +152,19 @@ export async function runPipeline(cfg, opts = {}) {
   if (d.search && !candidates.length) warnings.push("搜索已就绪但 0 条候选：多为检索式太窄或结果被噪声域名过滤，建议放宽市场/商品组合。");
 
   // 跨天去重：优先跑没见过的域名，新域名不够时才用回访补位
+  // LR_IGNORE_DEDUPE=1 是「验证模式」，只在操作台勾了「忽略去重」时由服务端注入，
+  // 不落配置文件——免得某天忘了关，定时任务天天重发同一批老面孔。
   const dd = cfg.dedupe || {};
-  const dedupeOn = dd.enabled !== false && d.search;
+  const ignoreDedupe = process.env.LR_IGNORE_DEDUPE === "1";
+  const dedupeOn = dd.enabled !== false && d.search && !ignoreDedupe;
   const ttl = Number(dd.ttl_days) > 0 ? Number(dd.ttl_days) : 14;
   const minNew = Number(dd.min_new_per_run) > 0 ? Number(dd.min_new_per_run) : 6;
   let newCount = candidates.length;
   let revisitCount = 0;
+  if (ignoreDedupe && d.search) {
+    console.log(`  [去重] 已忽略（验证模式）：全部 ${candidates.length} 个候选都参与抓取`);
+    warnings.push(`本次忽略跨天去重（验证模式）：候选 ${candidates.length} 个全部抓取，报告里会出现之前见过的老面孔。`);
+  }
   if (dedupeOn && candidates.length) {
     const { fresh, revisit } = splitSeen(candidates, ttl);
     newCount = fresh.length;
@@ -269,6 +276,7 @@ export async function runPipeline(cfg, opts = {}) {
     new_domains: newCount,
     revisit_domains: kept.filter((l) => l.revisit).length,
     dedupe_ttl: dedupeOn ? ttl : 0,
+    dedupe_ignored: ignoreDedupe,
     leads: kept.length,
     qualified: kept.filter((l) => l.status === "qualified").length,
     review: kept.filter((l) => l.status === "review").length,
