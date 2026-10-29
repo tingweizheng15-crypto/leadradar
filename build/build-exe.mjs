@@ -19,7 +19,9 @@ const BUILD = path.join(ROOT, "build");
 const DIST = path.join(ROOT, "dist");
 const OUT_NAME = "LeadRadar获客雷达.exe";
 
-const EXCLUDE_DIRS = new Set(["build", "dist", "node_modules", ".git", "out", "exports", "screenshots", ".workbuddy"]);
+// data/ 是运行期状态（去重库 + Chrome 登录态，含 cookie），绝不能打进 EXE：
+// 既会把体积从 80MB 撑到 150MB+，也等于把用户的登录态发给每一个拿到 EXE 的人
+const EXCLUDE_DIRS = new Set(["build", "dist", "node_modules", ".git", "out", "exports", "screenshots", ".workbuddy", "data"]);
 const INCLUDE_EXT = new Set([".mjs", ".cjs", ".json", ".html", ".md", ".example", ".txt"]);
 const SKIP_FILES = new Set(["package-lock.json", ".env", "config.json"]);
 

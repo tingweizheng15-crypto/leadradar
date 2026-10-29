@@ -52,6 +52,8 @@ export function loadConfig() {
   if (env.GOOGLE_CSE_CX) g.cx = env.GOOGLE_CSE_CX;
 
   const ef = cfg.contacts?.email_finder || (cfg.contacts.email_finder = {});
+  // 操作台切换查找服务时只写 .env，不动 config.json；这里做一次覆盖
+  if (env.EMAIL_FINDER_PROVIDER) ef.provider = String(env.EMAIL_FINDER_PROVIDER).trim();
   const hunter = ef.hunter || (ef.hunter = {});
   const apollo = ef.apollo || (ef.apollo = {});
   const snov = ef.snov || (ef.snov = {});

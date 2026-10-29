@@ -80,6 +80,19 @@
   iframe{width:100%;height:560px;border:1px solid var(--line);border-radius:12px;background:#fff;margin-top:12px}
   .toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,16px);background:#0f172a;color:#fff;padding:10px 16px;border-radius:10px;font-size:12.5px;opacity:0;pointer-events:none;transition:.2s;z-index:90}
   .toast.on{opacity:1;transform:translate(-50%,0)}
+  /* 邮箱卡片 */
+  .mbox{border-top:1px dashed #e3eaf3;margin-top:14px;padding-top:14px}
+  .mbox.first{border-top:none;margin-top:0;padding-top:0}
+  .mhead{font-size:12.5px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .mtag{font-weight:500;font-size:10.5px;padding:2px 8px;border-radius:999px;background:#f1f5f9;color:var(--ink2)}
+  .mtag.on{background:#dcfce7;color:#15803d}
+  .mtag.off{background:#fef3c7;color:#b45309}
+  .mstate{font-size:11.5px;line-height:1.95;margin-top:9px;color:var(--ink2)}
+  .mstate .step{display:flex;gap:8px}
+  .mstate .step b{flex:0 0 42px;color:var(--ink3);font-weight:500}
+  .vrow{display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid #f4f6fa;font-size:12px}
+  .vrow:last-child{border-bottom:none}
+  .vtag{font-size:10px;padding:1px 7px;border-radius:5px;flex:0 0 auto}
   @media(max-width:860px){.g2,.g3{grid-template-columns:1fr}.row{grid-template-columns:1fr}}
 </style>
 </head>
@@ -151,12 +164,11 @@
       <div class="kvsub" id="proxyNow">当前生效：—</div>
 
       <details style="margin-top:6px">
-        <summary style="font-size:11.5px;color:var(--ink3);cursor:pointer;outline:none">更多密钥（Bing / Google CSE / 邮箱查找，可留空）</summary>
+        <summary style="font-size:11.5px;color:var(--ink3);cursor:pointer;outline:none">更多密钥（Bing / Google CSE，可留空）</summary>
         <div style="margin-top:10px">
           <div class="row"><label>Bing key</label><input id="BING_API_KEY" data-key="BING_API_KEY" placeholder="选了 Bing 才需要"></div>
           <div class="row"><label>Google CSE key</label><input id="GOOGLE_CSE_KEY" data-key="GOOGLE_CSE_KEY" placeholder="选了 CSE 才需要"></div>
           <div class="row"><label>CSE 引擎 ID (cx)</label><input id="GOOGLE_CSE_CX" data-key="GOOGLE_CSE_CX" placeholder="cx= 后面那串"></div>
-          <div class="row"><label>Hunter 邮箱查找</label><input id="HUNTER_API_KEY" data-key="HUNTER_API_KEY" placeholder="可选：补全官网没写的邮箱"></div>
         </div>
       </details>
 
@@ -165,6 +177,58 @@
         <button class="ghost" id="b-reload">刷新</button>
       </div>
       <div class="hint">保存后下一轮任务即生效，无需重启。值只写入本机 <code>.env</code>（已在 .gitignore 内），页面回显为掩码。填完建议点「联网实测」验证 key 真的通。</div>
+    </div>
+  </div>
+
+  <div class="card cfg" id="mailCard" style="margin-bottom:14px">
+    <h2>邮箱（找客户邮箱 / 登录你的发信邮箱）</h2>
+    <div class="kvsub" id="mailSummary" style="margin:0 0 14px">加载中…</div>
+
+    <div class="mbox first">
+      <div class="mhead">① 找客户邮箱 · 邮箱查找服务 <span class="mtag" id="mfBadge">未配置</span></div>
+      <div class="row"><label>服务商</label><select id="mfProvider"></select></div>
+      <div id="mfFields"></div>
+      <div class="kvsub" id="mfNote" style="margin-left:160px"></div>
+      <div class="btns" style="margin-top:10px">
+        <button class="primary" id="b-mfSave">保存并测试</button>
+        <button class="ghost" id="b-mfLogin">打开后台登录</button>
+        <button class="ghost" id="b-mfGrab">登录后读回 key</button>
+      </div>
+      <div class="mstate" id="mfState"></div>
+    </div>
+
+    <div class="mbox">
+      <div class="mhead">② 你的发信邮箱 · SMTP 登录 <span class="mtag" id="mBadge">未登录</span></div>
+      <div class="row"><label>邮箱地址</label><input id="mUser" placeholder="you@company.com" autocomplete="username" spellcheck="false"></div>
+      <div class="row"><label>密码 / 授权码</label><input id="mPass" type="password" placeholder="多数邮箱要用授权码，不是网页登录密码" autocomplete="current-password"></div>
+      <div class="row"><label>服务器</label><input id="mHost" placeholder="自动识别，如 smtp.qq.com" spellcheck="false"></div>
+      <div class="row"><label>端口 / 加密</label>
+        <div style="display:flex;gap:8px">
+          <input id="mPort" inputmode="numeric" style="max-width:110px" placeholder="465">
+          <select id="mSecure" style="max-width:200px">
+            <option value="ssl">SSL（465，最常见）</option>
+            <option value="starttls">STARTTLS（587）</option>
+          </select>
+        </div>
+      </div>
+      <div class="kvsub" id="mPresetHint" style="margin-left:160px"></div>
+      <div class="btns" style="margin-top:10px">
+        <button class="primary" id="b-mLogin">登录测试</button>
+        <button class="ghost" id="b-mSave">只保存不测试</button>
+        <button class="ghost" id="b-mSend">发一封测试邮件</button>
+        <button class="ghost" id="b-mWeb">打开网页邮箱</button>
+      </div>
+      <div class="mstate" id="mState"></div>
+    </div>
+
+    <div class="mbox">
+      <div class="mhead">③ 验证邮箱是否真实存在 <span class="mtag">用上面的登录态做 SMTP 探测</span></div>
+      <textarea id="mVerifyList" rows="3" spellcheck="false" placeholder="一行一个邮箱，例如：&#10;hello@brand.com&#10;info@shop.co.kr"></textarea>
+      <div class="btns" style="margin-top:8px">
+        <button id="b-mVerify">开始验证</button>
+        <span class="kvsub" id="mVerifyHint" style="margin:2px 0 0 4px">最多 25 个；对「全收」域名会标出来，那种地址验证不了</span>
+      </div>
+      <div class="mstate" id="mVerifyState"></div>
     </div>
   </div>
 
@@ -281,7 +345,7 @@
   </div>
 
   <div class="foot">
-    本操作台只做「触发 + 查看」，不代替你发任何消息。获客报告里的邮箱标注 (官方)/(候选)，候选邮箱发信前需人工验证。
+    本操作台只做「触发 + 查看 + 测试发信」，不会自动给客户群发。获客报告里的邮箱标注 (官方)=官网公开 / (候选)=查找服务推测，候选地址发信前建议先跑一次「验证邮箱是否真实存在」。
   </div>
 </div>
 <div class="toast" id="toast"></div>
@@ -299,11 +363,11 @@ function pill(cls, label, val, goto){
 function ago(ms){ if(ms<0) return "已过期"; const m=Math.floor(ms/60000); if(m<60) return m+" 分钟后"; const h=Math.floor(m/60); return h+" 小时 "+(m%60)+" 分后"; }
 
 function gotoConfig(key){
-  const card = $("#cfgCard");
+  const card = key === "mailCard" ? $("#mailCard") : $("#cfgCard");
   card.scrollIntoView({behavior:"smooth",block:"center"});
   card.classList.add("flash");
   setTimeout(()=>card.classList.remove("flash"), 1800);
-  const el = $("#" + key);
+  const el = key === "mailCard" ? null : $("#" + key);
   if(el){ el.focus({ preventScroll: true }); el.scrollIntoView({behavior:"smooth",block:"center"}); }
 }
 
@@ -339,6 +403,9 @@ async function loadStatus(){
   p.push(pill(s.keys.llm?"on":"off","大模型", s.keys.llm ? s.keys.llmModel : "未配置，去填", !s.keys.llm && "LLM_API_KEY"));
   p.push(pill(s.chrome?"on":"bad","Chrome", s.chrome?"就绪":"缺失"));
   p.push(pill(s.proxy?"on":"off","代理", s.proxy?s.proxy.replace(/^https?:\/\//,""):"未配置"));
+  const m = s.mail || {};
+  const mailLabel = m.smtpReady ? "可发信" : (m.finderReady ? "查找已配" : "未配置，去填");
+  p.push(pill(m.smtpReady||m.finderReady?"on":"off","邮箱", mailLabel, !m.smtpReady && "mailCard"));
   $("#pills").innerHTML = p.join("");
   document.querySelectorAll("[data-goto]").forEach(el=>el.onclick=()=>gotoConfig(el.dataset.goto));
   renderBanner(s);
@@ -557,6 +624,238 @@ $("#b-sfetch").onclick = async ()=>{
   }
 };
 
+// ---------- 邮箱：查找服务 + 发信登录 ----------
+const MAIL = { state: null, presets: {}, providers: [] };
+
+async function loadMail(){
+  try{
+    const s = await api("/api/mail/state");
+    MAIL.state = s;
+    MAIL.presets = s.presets || {};
+    MAIL.providers = s.finder.providers || [];
+    renderFinder(s.finder);
+    renderSmtp(s.smtp);
+    $("#mailSummary").innerHTML = mailSummary(s);
+  }catch(e){
+    $("#mailSummary").textContent = "邮箱配置加载失败：" + String(e.message||e);
+  }
+}
+
+function mailSummary(s){
+  const f = s.finder, m = s.smtp;
+  const fTxt = f.provider === "none"
+    ? "查找服务：未启用（只挖官网公开邮箱）"
+    : f.ready ? `查找服务：${f.provider} 已就绪` : `查找服务：${f.provider} 缺 key`;
+  const mTxt = m.ready ? `发信邮箱：${m.user} 已配置` : "发信邮箱：未登录";
+  return `<b>${esc(fTxt)}</b>　·　${esc(mTxt)}<br>
+    <span style="color:var(--ink3)">① 决定「能不能找到更多邮箱」，② 决定「能不能登录发信 / 验证邮箱」。两部分各自独立，值只写本机 <code>.env</code>，不上传。</span>`;
+}
+
+function renderFinder(f){
+  const sel = $("#mfProvider");
+  if(!sel.options.length){
+    sel.innerHTML = (MAIL.providers||[]).map(p=>`<option value="${esc(p.key)}">${esc(p.name)}</option>`).join("");
+  }
+  sel.value = f.provider || "none";
+  renderFinderFields(f);
+  const badge = $("#mfBadge");
+  badge.textContent = f.ready ? "已配置" : (f.provider === "none" ? "未启用" : "缺 key");
+  badge.className = "mtag " + (f.ready ? "on" : "off");
+}
+
+function renderFinderFields(f){
+  const key = $("#mfProvider").value || "none";
+  const p = (MAIL.providers||[]).find(x=>x.key===key) || MAIL.providers[0] || { fields: [], note: "" };
+  const keys = (f && f.keys) || {};
+  $("#mfFields").innerHTML = (p.fields||[]).map(fl=>{
+    const shown = keys[fl.env] || "";
+    const pre = fl.env === "SNOV_USER_ID" ? (shown ? ` value="${esc(shown)}"` : "") : "";
+    const ph = shown ? `${shown}（已设置，留空不修改）` : fl.placeholder;
+    return `<div class="row"><label>${esc(fl.label)}</label>
+      <input data-fkey="${esc(fl.name)}" data-env="${esc(fl.env)}"${pre} placeholder="${esc(ph)}" spellcheck="false" autocomplete="off"></div>`;
+  }).join("");
+  $("#mfNote").textContent = p.note || "";
+  $("#b-mfGrab").style.display = p.key === "hunter" ? "" : "none";
+  $("#b-mfLogin").style.display = p.console ? "" : "none";
+}
+
+function renderSmtp(s){
+  $("#mUser").value = s.user || "";
+  $("#mPass").value = "";
+  $("#mPass").placeholder = s.passSet ? "已保存，留空不修改" : "授权码 / 应用专用密码";
+  $("#mHost").value = s.host || "";
+  $("#mPort").value = s.port || "";
+  $("#mSecure").value = s.secure ? "ssl" : "starttls";
+  $("#mPresetHint").textContent = s.preset ? s.preset.hint : "";
+  const badge = $("#mBadge");
+  badge.textContent = s.ready ? "已登录" : "未登录";
+  badge.className = "mtag " + (s.ready ? "on" : "off");
+}
+
+function mailSteps(sel, r, okText){
+  const steps = (r.steps||[]).map(x=>`<div class="step"><b>${esc(x.k)}</b><span>${esc(x.v)}</span></div>`).join("");
+  const head = r.ok
+    ? `<div style="color:var(--ok);font-weight:600">✓ ${esc(okText)}${r.ms!=null?`（${(r.ms/1000).toFixed(1)}s${r.auth?` · AUTH ${esc(r.auth)}`:""}）`:""}</div>`
+    : `<div style="color:var(--bad);font-weight:600">✕ ${esc(r.error||"失败")}</div>`;
+  $(sel).innerHTML = head + steps;
+}
+
+function smtpForm(){
+  return {
+    user: $("#mUser").value.trim(),
+    pass: $("#mPass").value,
+    host: $("#mHost").value.trim(),
+    port: $("#mPort").value.trim(),
+    secure: $("#mSecure").value,
+  };
+}
+
+$("#mfProvider").onchange = ()=>renderFinderFields(MAIL.state && MAIL.state.finder);
+
+$("#b-mfSave").onclick = async ()=>{
+  const body = { provider: $("#mfProvider").value, test: true };
+  document.querySelectorAll("[data-fkey]").forEach(el=>{ body[el.dataset.fkey] = el.value.trim(); });
+  const btn = $("#b-mfSave"); btn.disabled = true;
+  $("#mfState").innerHTML = '<span style="color:var(--ink3)">保存并测试中…（走代理请求服务商，约 2-8 秒）</span>';
+  try{
+    const r = await api("/api/mail/finder", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body) });
+    if(!r.ok){ $("#mfState").innerHTML = `<span style="color:var(--bad)">✕ ${esc(r.error||"保存失败")}</span>`; return; }
+    if(r.test){
+      $("#mfState").innerHTML = r.test.ok
+        ? `<span style="color:var(--ok)">✓ ${esc(r.provider)} 可用${r.test.detail?` · ${esc(r.test.detail)}`:""}</span><div style="color:var(--ink3);margin-top:4px">已写入 .env，下一轮流水线就会用它补全邮箱</div>`
+        : `<span style="color:var(--bad)">✕ 已保存，但测试没通过：${esc(r.test.error||"未知原因")}</span>`;
+      toast(r.test.ok ? "已保存，服务可用" : "已保存，但 key 没通过测试");
+    } else {
+      toast("已保存" + (r.applied && r.applied.length ? "：" + r.applied.join(", ") : ""));
+      $("#mfState").innerHTML = r.provider === "none"
+        ? '<span style="color:var(--ink2)">已关闭查找服务，只抓官网公开邮箱</span>'
+        : "";
+    }
+    await loadMail(); loadStatus();
+  }catch(e){ $("#mfState").innerHTML = `<span style="color:var(--bad)">✕ ${esc(String(e.message||e))}</span>`; }
+  finally{ btn.disabled = false; }
+};
+
+$("#b-mfLogin").onclick = async ()=>{
+  const r = await api("/api/mail/finder/login", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ provider: $("#mfProvider").value }) });
+  if(r.ok){ toast("已打开后台，登录后回到这里填 key"); $("#mfState").innerHTML = `<span style="color:var(--ink2)">已打开：${esc(r.url)}</span>`; }
+  else toast(r.error || "打不开");
+};
+
+$("#b-mfGrab").onclick = async ()=>{
+  const btn = $("#b-mfGrab"); btn.disabled = true;
+  $("#mfState").innerHTML = '<span style="color:var(--ink3)">用你登录过的 Chrome 打开 API 页面读取…（10-20 秒）</span>';
+  try{
+    const r = await api("/api/mail/finder/grab", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ provider: $("#mfProvider").value }) });
+    if(!r.ok){ $("#mfState").innerHTML = `<span style="color:var(--bad)">✕ ${esc(r.error||"读取失败")}</span>`; return; }
+    if(r.candidates && r.candidates.length){
+      const el = document.querySelector('[data-fkey="hunterKey"]');
+      if(el && r.candidates.length === 1){ el.value = r.candidates[0]; }
+      $("#mfState").innerHTML = `<span style="color:var(--ok)">✓ 读到 ${r.candidates.length} 个候选 key</span>`
+        + r.candidates.map(c=>`<div>${esc(c)} <a href="#" data-use="${esc(c)}" style="color:var(--red-d)">用这个</a></div>`).join("")
+        + `<div style="color:var(--ink3);margin-top:4px">确认无误后点「保存并测试」</div>`;
+      document.querySelectorAll("[data-use]").forEach(a=>a.onclick=(e)=>{
+        e.preventDefault();
+        const input = document.querySelector('[data-fkey="hunterKey"]');
+        if(input){ input.value = a.dataset.use; toast("已填入，点保存并测试"); }
+      });
+    } else {
+      $("#mfState").innerHTML = `<span style="color:var(--ink2)">${esc(r.hint||"没读到 key")}</span>`;
+    }
+  }catch(e){ $("#mfState").innerHTML = `<span style="color:var(--bad)">✕ ${esc(String(e.message||e))}</span>`; }
+  finally{ btn.disabled = false; }
+};
+
+// 按域名自动填服务器：qq/163/gmail 这些常见邮箱直接给对，省得用户查
+$("#mUser").addEventListener("blur", ()=>{
+  const email = $("#mUser").value.trim();
+  const domain = (email.split("@")[1]||"").toLowerCase();
+  if(!domain) return;
+  const p = MAIL.presets[domain];
+  if(p){
+    if(!$("#mHost").value.trim()) $("#mHost").value = p.host;
+    $("#mPort").value = p.port;
+    $("#mSecure").value = p.secure ? "ssl" : "starttls";
+    $("#mPresetHint").textContent = p.hint || "";
+  } else if(!$("#mHost").value.trim()){
+    $("#mHost").value = "smtp." + domain;
+    $("#mPort").value = 465;
+    $("#mSecure").value = "ssl";
+    $("#mPresetHint").textContent = "域名没认出来，按 smtp.<域名>:465 猜的；企业邮请换成服务商地址（腾讯企业邮 smtp.exmail.qq.com / 阿里企业邮 smtp.qiye.aliyun.com）。";
+  }
+});
+
+$("#b-mLogin").onclick = async ()=>{
+  const body = smtpForm();
+  if(!body.user){ toast("先填邮箱地址"); $("#mUser").focus(); return; }
+  if(!body.pass && !(MAIL.state && MAIL.state.smtp && MAIL.state.smtp.passSet)){ toast("填一下授权码 / 密码"); $("#mPass").focus(); return; }
+  const btn = $("#b-mLogin"); btn.disabled = true;
+  $("#mState").innerHTML = '<span style="color:var(--ink3)">连接 SMTP 并认证中…（约 2-6 秒）</span>';
+  try{
+    const r = await api("/api/mail/smtp/login", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body) });
+    mailSteps("#mState", r, "登录成功，已写入 .env");
+    if(r.ok){ toast("登录成功"); await loadMail(); loadStatus(); }
+  }catch(e){ $("#mState").innerHTML = `<span style="color:var(--bad)">✕ ${esc(String(e.message||e))}</span>`; }
+  finally{ btn.disabled = false; }
+};
+
+$("#b-mSave").onclick = async ()=>{
+  const r = await api("/api/mail/smtp/save", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(smtpForm()) });
+  if(r.ok){ toast("已保存到 .env" + (r.applied && r.applied.length ? "：" + r.applied.join(", ") : "")); await loadMail(); loadStatus(); }
+  else toast(r.error || "保存失败");
+};
+
+$("#b-mSend").onclick = async ()=>{
+  const to = (MAIL.state && MAIL.state.smtp && MAIL.state.smtp.user) || $("#mUser").value.trim();
+  if(!to){ toast("先填邮箱地址"); return; }
+  const btn = $("#b-mSend"); btn.disabled = true;
+  $("#mState").innerHTML = '<span style="color:var(--ink3)">发送中…</span>';
+  try{
+    const r = await api("/api/mail/smtp/send", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ to }) });
+    $("#mState").innerHTML = r.ok
+      ? `<span style="color:var(--ok)">✓ 已发出：${esc(r.to)}</span><div style="color:var(--ink3)">去收件箱看看（没收到先翻垃圾箱）。收到说明登录态、发信链路都通了。</div>`
+      : `<span style="color:var(--bad)">✕ ${esc(r.error||"发送失败")}</span>`;
+    if(r.ok) toast("测试邮件已发出");
+  }catch(e){ $("#mState").innerHTML = `<span style="color:var(--bad)">✕ ${esc(String(e.message||e))}</span>`; }
+  finally{ btn.disabled = false; }
+};
+
+$("#b-mWeb").onclick = ()=>{
+  const s = (MAIL.state && MAIL.state.smtp) || {};
+  const web = (s.preset && s.preset.web) || (s.user ? "https://mail." + s.user.split("@")[1] : "");
+  if(!web){ toast("先填邮箱地址"); return; }
+  window.open(web, "_blank", "noopener");
+};
+
+const V_STATUS = {
+  ok: ["有效", "#15803d", "#dcfce7"],
+  invalid: ["不存在", "#b91c1c", "#fee2e2"],
+  catchall: ["全收 · 判断不了", "#b45309", "#fef3c7"],
+  unknown: ["判断不了", "#475569", "#f1f5f9"],
+  blocked: ["服务器不让查", "#475569", "#f1f5f9"],
+};
+
+$("#b-mVerify").onclick = async ()=>{
+  const text = $("#mVerifyList").value.trim();
+  if(!text){ toast("先贴几个邮箱，一行一个"); $("#mVerifyList").focus(); return; }
+  const btn = $("#b-mVerify"); btn.disabled = true;
+  $("#mVerifyState").innerHTML = '<span style="color:var(--ink3)">逐个探测中…（每个约 1-2 秒）</span>';
+  try{
+    const r = await api("/api/mail/verify", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ text }) });
+    if(!r.ok){ $("#mVerifyState").innerHTML = `<span style="color:var(--bad)">✕ ${esc(r.error||"验证失败")}</span>`; return; }
+    const rows = r.results.map(x=>{
+      const [label, fg, bg] = V_STATUS[x.status] || V_STATUS.unknown;
+      return `<div class="vrow"><span class="vtag" style="color:${fg};background:${bg}">${label}</span>
+        <span style="flex:1;word-break:break-all">${esc(x.email)}</span>
+        <span style="color:var(--ink3);font-size:11px">${esc(String(x.code||""))}</span></div>`;
+    }).join("");
+    const s = r.summary || {};
+    $("#mVerifyState").innerHTML = `<div style="margin-bottom:6px">共 ${s.total||0} 个：<b style="color:var(--ok)">有效 ${s.ok||0}</b>　
+      <b style="color:var(--bad)">不存在 ${s.invalid||0}</b>　全收 ${s.catchall||0}　判断不了 ${s.unknown||0}</div>${rows}`;
+  }catch(e){ $("#mVerifyState").innerHTML = `<span style="color:var(--bad)">✕ ${esc(String(e.message||e))}</span>`; }
+  finally{ btn.disabled = false; }
+};
+
 // ---------- 中文关键词 → 本地语 ----------
 const TR_MARKETS = { KR:"韩国", TH:"泰国", ID:"印尼", MY:"马来", US:"美国", UK:"英国" };
 
@@ -680,6 +979,7 @@ document.querySelectorAll("[data-copy]").forEach(b=>b.onclick=async ()=>{
   await loadStatus();
   await loadEnv();
   await loadQueries();
+  await loadMail();
   loadSocialStatus();
   attachJob();
   // EXE 首次启动带 #setup：缺 key 就直接滚到配置区，别让用户自己找

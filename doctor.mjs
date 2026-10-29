@@ -8,6 +8,7 @@ import fs from "node:fs";
 import path from "node:path";
 import net from "node:net";
 import { loadConfig, loadEnvFile, ROOT, searchReady, llmReady, emailFinderReady } from "./src/config.mjs";
+import { smtpConfig } from "./src/mailer.mjs";
 import { findChrome } from "./src/enrich.mjs";
 import { providerName, search } from "./src/search.mjs";
 import { callLLM, parseJson } from "./src/llm.mjs";
@@ -54,6 +55,11 @@ else warn("大模型", "未配置 → 无 AI 判断与开发信草稿，仅规�
 
 if (emailFinderReady(cfg)) ok("邮箱查找", `${cfg.contacts.email_finder.provider} 已配置`);
 else warn("邮箱查找", "未配置（可选）→ 只挖官网公开邮箱");
+
+// 发信邮箱只做本地判断：真正的登录测试在操作台里点（要真连 SMTP）
+const smtp = smtpConfig({ ...process.env, ...loadEnvFile() });
+if (smtp.ready) ok("发信邮箱", `${smtp.user} @ ${smtp.host}:${smtp.port}（配置完整，未做登录测试）`);
+else warn("发信邮箱", "未登录（可选）→ 报告照常出，只是不能发测试信/验证邮箱");
 
 // 4. Chrome
 const chrome = findChrome();

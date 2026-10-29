@@ -195,40 +195,43 @@ export function extractAll(html, pageUrl) {
   };
 }
 
+// 邮箱查找服务同样要走代理：国内直连 api.hunter.io / api.snov.io 经常超时，
+// 而操作台的「测试 key」走代理、流水线走直连，就会出现「测通了跑不通」的假象。
+async function finderJson(cfg, url, opts = {}) {
+  const ctrl = new AbortController();
+  const timeout = cfg.search.timeout_ms || 15000;
+  const t = setTimeout(() => ctrl.abort(), timeout);
+  try {
+    const res = await proxiedFetch(cfg, url, { ...opts, signal: ctrl.signal }, timeout);
+    const text = await res.text();
+    if (!res.ok) throw new Error(`HTTP ${res.status} ${text.slice(0, 120)}`);
+    return text ? JSON.parse(text) : {};
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 async function hunter(cfg, domain) {
   const h = cfg.contacts.email_finder.hunter;
   const url = `${h.endpoint}?domain=${encodeURIComponent(domain)}&api_key=${encodeURIComponent(h.apiKey)}`;
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), cfg.search.timeout_ms);
-  const res = await fetch(url, { signal: ctrl.signal });
-  const data = await res.json();
-  clearTimeout(t);
+  const data = await finderJson(cfg, url);
   return (data.data?.emails || []).map((e) => ({ value: e.value, source: "hunter", confidence: "candidate", type: e.type || "" }));
 }
 
 async function snov(cfg, domain) {
   const s = cfg.contacts.email_finder.snov;
   const url = `${s.endpoint}?domain=${encodeURIComponent(domain)}&userId=${encodeURIComponent(s.userId)}&secret=${encodeURIComponent(s.secret)}`;
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), cfg.search.timeout_ms);
-  const res = await fetch(url, { signal: ctrl.signal });
-  const data = await res.json();
-  clearTimeout(t);
+  const data = await finderJson(cfg, url);
   return Object.values(data.emails || {}).map((e) => ({ value: e.email, source: "snov", confidence: "candidate", type: e.type || "" }));
 }
 
 async function apollo(cfg, domain) {
   const a = cfg.contacts.email_finder.apollo;
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), cfg.search.timeout_ms);
-  const res = await fetch(a.endpoint, {
+  const data = await finderJson(cfg, a.endpoint, {
     method: "POST",
-    signal: ctrl.signal,
     headers: { "Content-Type": "application/json", "X-Api-Key": a.apiKey },
     body: JSON.stringify({ q_organization_domains: domain, page: 1, per_page: 10 }),
   });
-  const data = await res.json();
-  clearTimeout(t);
   return (data.people || []).map((p) => ({ value: p.email, source: "apollo", confidence: "candidate", name: p.name, title: p.title })).filter((e) => e.value);
 }
 

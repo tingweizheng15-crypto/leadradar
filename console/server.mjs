@@ -19,9 +19,13 @@ import { buildSocialQueries } from "../src/social.mjs";
 import { seenStats, loadSeen } from "../src/store.mjs";
 import { isNoiseUrl } from "../src/pipeline.mjs";
 import { isSocialUrl, parseSocialUrl } from "../src/social.mjs";
-import { PLATFORMS, profileState, launchLogin, checkLogin, loginStatus } from "../src/browser.mjs";
+import { PLATFORMS, profileState, launchLogin, checkLogin, loginStatus, dumpDom } from "../src/browser.mjs";
 import { fetchProfile } from "../src/socialfetch.mjs";
 import { translateKeywords } from "../src/translate.mjs";
+import {
+  MAIL_PRESETS, FINDER_PROVIDERS, finderProvider, mailPreset,
+  smtpConfig, smtpLogin, verifyAddresses, sendMail, testFinder,
+} from "../src/mailer.mjs";
 
 /** 操作台预览要用和流水线完全一致的预算分配，否则显示的条数是假的 */
 function queryPlan(cfg) {
@@ -46,9 +50,18 @@ const KINDS = {
   scheduler: { script: "scheduler.mjs", label: "定时器（常驻）", args: [], longRunning: true },
 };
 
-const ENV_KEYS = ["SEARCH_PROVIDER", "SERPER_API_KEY", "BING_API_KEY", "GOOGLE_CSE_KEY", "GOOGLE_CSE_CX", "LLM_API_KEY", "LLM_BASE_URL", "LLM_MODEL", "LLM_MAX_TOKENS", "HUNTER_API_KEY", "APOLLO_API_KEY", "SNOV_USER_ID", "SNOV_SECRET", "CHROME_PATH", "HTTPS_PROXY"];
+const ENV_KEYS = [
+  "SEARCH_PROVIDER", "SERPER_API_KEY", "BING_API_KEY", "GOOGLE_CSE_KEY", "GOOGLE_CSE_CX",
+  "LLM_API_KEY", "LLM_BASE_URL", "LLM_MODEL", "LLM_MAX_TOKENS",
+  "HUNTER_API_KEY", "APOLLO_API_KEY", "SNOV_USER_ID", "SNOV_SECRET", "EMAIL_FINDER_PROVIDER",
+  "SMTP_USER", "SMTP_PASS", "SMTP_HOST", "SMTP_PORT", "SMTP_SECURE", "SMTP_FROM", "SMTP_NAME",
+  "CHROME_PATH", "HTTPS_PROXY",
+];
 // 这些不是秘密，页面要回显真实值（否则用户不知道自己当前用的是哪个 provider / 模型）
-const PLAIN_KEYS = new Set(["SEARCH_PROVIDER", "LLM_BASE_URL", "LLM_MODEL", "HTTPS_PROXY", "CHROME_PATH"]);
+const PLAIN_KEYS = new Set([
+  "SEARCH_PROVIDER", "LLM_BASE_URL", "LLM_MODEL", "HTTPS_PROXY", "CHROME_PATH",
+  "EMAIL_FINDER_PROVIDER", "SMTP_USER", "SMTP_HOST", "SMTP_PORT", "SMTP_SECURE", "SMTP_FROM", "SMTP_NAME",
+]);
 const MASK = "••••••";
 
 let jobSeq = 0;
@@ -153,6 +166,7 @@ function statusPayload() {
   const cfg = loadConfig();
   const env = loadEnvFile();
   const proxy = cfg.proxy || process.env.HTTPS_PROXY || process.env.HTTP_PROXY || "";
+  const sm = smtpConfig({ ...process.env, ...env });
   const jobsList = jobsOf(cfg).map((j) => {
     const next = nextRunEpoch(parseHms(j.time), j.tz);
     return { key: j.key, name: j.name, time: j.time, enabled: j.enabled, tz: j.tz, nextText: fmt(next, j.tz), nextInMs: next - Date.now() };
@@ -166,6 +180,12 @@ function statusPayload() {
       llm: llmReady(cfg), llmModel: llmReady(cfg) ? cfg.llm.model : "未配置",
       emailFinder: emailFinderReady(cfg),
     },
+    mail: {
+      finderProvider: cfg.contacts.email_finder.provider || "none",
+      finderReady: emailFinderReady(cfg),
+      smtpReady: sm.ready,
+      smtpUser: sm.user,
+    },
     chrome: findChrome() || "",
     proxy,
     files: { config: fs.existsSync(path.join(ROOT, "config.json")), env: fs.existsSync(path.join(ROOT, ".env")) },
@@ -178,12 +198,18 @@ function statusPayload() {
   };
 }
 
+function maskOf(v) {
+  const s = String(v || "");
+  if (!s) return "";
+  return s.length <= 8 ? MASK : s.slice(0, 4) + MASK + s.slice(-2);
+}
+
 function maskEnv() {
   const env = loadEnvFile();
   const out = {};
   for (const k of ENV_KEYS) {
     const v = env[k] || "";
-    out[k] = !v ? "" : PLAIN_KEYS.has(k) ? v : (v.length <= 8 ? MASK : v.slice(0, 4) + MASK + v.slice(-2));
+    out[k] = !v ? "" : PLAIN_KEYS.has(k) ? v : maskOf(v);
   }
   return out;
 }
@@ -191,6 +217,8 @@ function maskEnv() {
 function saveEnv(updates) {
   const p = path.join(ROOT, ".env");
   const lines = fs.existsSync(p) ? fs.readFileSync(p, "utf8").split(/\r?\n/) : [];
+  // 文件末尾的空行先去掉，否则每保存一次就多一行空白
+  while (lines.length && lines[lines.length - 1].trim() === "") lines.pop();
   const applied = [];
   for (const [k, raw] of Object.entries(updates)) {
     if (!ENV_KEYS.includes(k)) continue;
@@ -209,6 +237,91 @@ function saveEnv(updates) {
 }
 
 const ALLOWED_EXT = new Set([".html", ".md", ".csv", ".json", ".png", ".txt", ".log"]);
+
+/* ---------------- 邮箱配置 ---------------- */
+
+// 登录/测试结果只放内存：重启后要重新点一次「登录测试」，避免拿着过期的结论骗自己
+let lastSmtpLogin = null;
+let lastFinderTest = null;
+
+const FINDER_ENV = {
+  hunterKey: "HUNTER_API_KEY",
+  apolloKey: "APOLLO_API_KEY",
+  snovUserId: "SNOV_USER_ID",
+  snovSecret: "SNOV_SECRET",
+};
+
+function mailEnv() {
+  // .env 优先：页面写进去的值必须立刻生效，不能被系统环境变量盖掉
+  return { ...process.env, ...loadEnvFile() };
+}
+
+function finderCreds(cfg) {
+  const ef = cfg.contacts.email_finder || {};
+  return {
+    apiKey: ef[ef.provider]?.apiKey || "",
+    userId: ef.snov?.userId || "",
+    secret: ef.snov?.secret || "",
+  };
+}
+
+function smtpPayload(env) {
+  const sm = smtpConfig(env);
+  const preset = sm.user ? mailPreset(sm.user) : null;
+  return {
+    user: sm.user,
+    host: sm.host,
+    port: sm.port,
+    secure: sm.secure,
+    from: sm.from,
+    name: sm.name,
+    passSet: !!sm.pass,
+    ready: sm.ready,
+    preset: preset ? { domain: preset.domain, hint: preset.hint, web: preset.web, guessed: !!preset.guessed } : null,
+  };
+}
+
+function mailStatePayload() {
+  const cfg = loadConfig();
+  const env = mailEnv();
+  return {
+    ok: true,
+    finder: {
+      provider: cfg.contacts.email_finder.provider || "none",
+      ready: emailFinderReady(cfg),
+      providers: FINDER_PROVIDERS,
+      keys: {
+        HUNTER_API_KEY: maskOf(env.HUNTER_API_KEY),
+        APOLLO_API_KEY: maskOf(env.APOLLO_API_KEY),
+        SNOV_USER_ID: env.SNOV_USER_ID || "",
+        SNOV_SECRET: maskOf(env.SNOV_SECRET),
+      },
+      lastTest: lastFinderTest,
+    },
+    smtp: smtpPayload(env),
+    lastLogin: lastSmtpLogin,
+    presets: MAIL_PRESETS,
+  };
+}
+
+/** 把「表单上的发信配置」解析成可用的 SMTP 参数：留空的字段回落到已保存的值 */
+function resolveSmtpInput(body, env) {
+  const cur = smtpConfig(env);
+  const user = cleanStr(body.user, 120) || cur.user;
+  const preset = user ? mailPreset(user) : null;
+  const pass = String(body.pass ?? "").trim() || cur.pass;
+  const host = cleanStr(body.host, 120) || cur.host || preset?.host || "";
+  const port = Number(body.port) || cur.port || preset?.port || 465;
+  const mode = String(body.secure ?? "").toLowerCase();
+  const secure = mode === "ssl" || mode === "1" || mode === "true" ? true
+    : mode === "starttls" || mode === "0" || mode === "false" ? false
+      : port === 465;
+  return {
+    user, pass, host, port, secure,
+    from: user,
+    name: cleanStr(body.name, 60) || cur.name,
+  };
+}
 
 /* ---------------- 检索词配置 ---------------- */
 
@@ -308,6 +421,168 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === "/api/status") return send(res, 200, "application/json", JSON.stringify(statusPayload()));
     if (url.pathname === "/api/reports") return send(res, 200, "application/json", JSON.stringify(listReports()));
     if (url.pathname === "/api/env" && req.method === "GET") return send(res, 200, "application/json", JSON.stringify(maskEnv()));
+
+    // ---------- 邮箱：查找服务 + 发信邮箱 ----------
+    if (url.pathname === "/api/mail/state" && req.method === "GET") {
+      return send(res, 200, "application/json", JSON.stringify(mailStatePayload()));
+    }
+
+    if (url.pathname === "/api/mail/finder" && req.method === "POST") {
+      try {
+        const body = JSON.parse((await readBody(req)) || "{}");
+        const updates = {};
+        if (["none", "hunter", "apollo", "snov"].includes(body.provider)) updates.EMAIL_FINDER_PROVIDER = body.provider;
+        for (const [k, envKey] of Object.entries(FINDER_ENV)) {
+          const v = String(body[k] ?? "").trim();
+          if (v && !v.includes(MASK)) updates[envKey] = v;
+        }
+        const applied = saveEnv(updates);
+        const cfg = loadConfig();
+        const provider = cfg.contacts.email_finder.provider || "none";
+        let test = null;
+        if (body.test && provider !== "none") {
+          test = await testFinder(cfg, provider, finderCreds(cfg));
+          lastFinderTest = { ...test, provider, at: Date.now() };
+        }
+        return send(res, 200, "application/json", JSON.stringify({
+          ok: true, applied, provider, ready: emailFinderReady(cfg), test, state: mailStatePayload(),
+        }));
+      } catch (e) {
+        return send(res, 200, "application/json", JSON.stringify({ ok: false, error: String(e.message || e).slice(0, 200) }));
+      }
+    }
+
+    if (url.pathname === "/api/mail/finder/test" && req.method === "POST") {
+      try {
+        const cfg = loadConfig();
+        const provider = cfg.contacts.email_finder.provider || "none";
+        if (provider === "none") {
+          return send(res, 200, "application/json", JSON.stringify({ ok: false, error: "先在上面选一个邮箱查找服务再测试" }));
+        }
+        const test = await testFinder(cfg, provider, finderCreds(cfg));
+        lastFinderTest = { ...test, provider, at: Date.now() };
+        return send(res, 200, "application/json", JSON.stringify({ ok: true, provider, test }));
+      } catch (e) {
+        return send(res, 200, "application/json", JSON.stringify({ ok: false, error: String(e.message || e).slice(0, 200) }));
+      }
+    }
+
+    // 打开服务商后台：登录一次，key 就在账号页里
+    if (url.pathname === "/api/mail/finder/login" && req.method === "POST") {
+      const body = JSON.parse((await readBody(req)) || "{}");
+      const p = finderProvider(body.provider || loadConfig().contacts.email_finder.provider);
+      if (!p.console) return send(res, 200, "application/json", JSON.stringify({ ok: false, error: "这个服务没有后台页面" }));
+      openBrowser(p.console);
+      return send(res, 200, "application/json", JSON.stringify({ ok: true, url: p.console, note: "已用默认浏览器打开，登录后把 key 复制回来" }));
+    }
+
+    // 登录后从页面上把 key 读回来（只有 Hunter 的 API 页是静态渲染，能读）
+    if (url.pathname === "/api/mail/finder/grab" && req.method === "POST") {
+      try {
+        const body = JSON.parse((await readBody(req)) || "{}");
+        const key = body.provider || loadConfig().contacts.email_finder.provider;
+        const p = finderProvider(key);
+        if (p.key !== "hunter") {
+          return send(res, 200, "application/json", JSON.stringify({ ok: false, error: `${p.name} 的 key 页是动态加载的，读不回来，手动复制一下更快` }));
+        }
+        const html = await dumpDom(p.grabUrl, { budget: 8000, timeout: 60000 });
+        const found = [...new Set(html.match(new RegExp(p.pattern, "g")) || [])].slice(0, 5);
+        return send(res, 200, "application/json", JSON.stringify({
+          ok: true,
+          url: p.grabUrl,
+          candidates: found,
+          hint: found.length ? "找到候选 key，确认后点保存" : "页面里没抓到 key：多半是登录态不在这份 Chrome 里（要在本工具打开的窗口里登录），或页面还没加载完。手动复制更快。",
+        }));
+      } catch (e) {
+        return send(res, 200, "application/json", JSON.stringify({ ok: false, error: String(e.message || e).slice(0, 200) }));
+      }
+    }
+
+    // 登录测试：真连 SMTP、真 AUTH；成功才写入 .env
+    if (url.pathname === "/api/mail/smtp/login" && req.method === "POST") {
+      try {
+        const body = JSON.parse((await readBody(req)) || "{}");
+        const sm = resolveSmtpInput(body, mailEnv());
+        const r = await smtpLogin(sm);
+        if (!r.ok) {
+          lastSmtpLogin = { ok: false, at: Date.now(), error: r.error, steps: r.steps || [] };
+          return send(res, 200, "application/json", JSON.stringify({
+            ok: false, error: r.error, steps: r.steps || [], host: sm.host, port: sm.port, secure: sm.secure,
+          }));
+        }
+        const applied = saveEnv({
+          SMTP_USER: sm.user,
+          SMTP_PASS: sm.pass,
+          SMTP_HOST: sm.host,
+          SMTP_PORT: String(sm.port),
+          SMTP_SECURE: sm.secure ? "1" : "0",
+          SMTP_FROM: sm.from,
+          SMTP_NAME: sm.name,
+        });
+        lastSmtpLogin = { ok: true, at: Date.now(), user: sm.user, host: sm.host, steps: r.steps, auth: r.auth, ms: r.ms };
+        return send(res, 200, "application/json", JSON.stringify({
+          ok: true, steps: r.steps, auth: r.auth, ms: r.ms, saved: applied, smtp: smtpPayload(mailEnv()),
+        }));
+      } catch (e) {
+        return send(res, 200, "application/json", JSON.stringify({ ok: false, error: String(e.message || e).slice(0, 240) }));
+      }
+    }
+
+    if (url.pathname === "/api/mail/smtp/save" && req.method === "POST") {
+      const body = JSON.parse((await readBody(req)) || "{}");
+      const sm = resolveSmtpInput(body, mailEnv());
+      if (!sm.user || !sm.host) {
+        return send(res, 200, "application/json", JSON.stringify({ ok: false, error: "邮箱地址和服务器地址都不能空" }));
+      }
+      const applied = saveEnv({
+        SMTP_USER: sm.user,
+        SMTP_PASS: sm.pass,
+        SMTP_HOST: sm.host,
+        SMTP_PORT: String(sm.port),
+        SMTP_SECURE: sm.secure ? "1" : "0",
+        SMTP_FROM: sm.from,
+        SMTP_NAME: sm.name,
+      });
+      return send(res, 200, "application/json", JSON.stringify({ ok: true, applied, smtp: smtpPayload(mailEnv()) }));
+    }
+
+    if (url.pathname === "/api/mail/smtp/send" && req.method === "POST") {
+      try {
+        const body = JSON.parse((await readBody(req)) || "{}");
+        const sm = smtpConfig(mailEnv());
+        if (!sm.ready) return send(res, 200, "application/json", JSON.stringify({ ok: false, error: "还没登录邮箱：填邮箱 + 授权码，先点「登录测试」" }));
+        const to = cleanStr(body.to, 120) || sm.user;
+        const r = await sendMail(sm, {
+          to,
+          subject: cleanStr(body.subject, 120) || "LeadRadar 测试邮件",
+          text: String(body.text || "").trim() || [
+            "这是一封来自 LeadRadar 的测试邮件。",
+            "",
+            `发信账号：${sm.user}`,
+            `时间：${new Date().toLocaleString("zh-CN", { hour12: false })}`,
+            "",
+            "收到它说明 SMTP 登录、发信链路都通了，后面报告里的开发信草稿可以直接用这个账号发。",
+          ].join("\n"),
+        });
+        return send(res, 200, "application/json", JSON.stringify({ ok: true, to: r.to, reply: r.reply }));
+      } catch (e) {
+        return send(res, 200, "application/json", JSON.stringify({ ok: false, error: String(e.message || e).slice(0, 240) }));
+      }
+    }
+
+    if (url.pathname === "/api/mail/verify" && req.method === "POST") {
+      try {
+        const body = JSON.parse((await readBody(req)) || "{}");
+        const sm = smtpConfig(mailEnv());
+        if (!sm.ready) return send(res, 200, "application/json", JSON.stringify({ ok: false, error: "验证要用你已登录的发信邮箱做 SMTP 探测，先在上面登录" }));
+        const list = Array.isArray(body.emails) ? body.emails : String(body.text || body.emails || "").split(/[\s,;]+/);
+        const r = await verifyAddresses(sm, list);
+        return send(res, 200, "application/json", JSON.stringify(r));
+      } catch (e) {
+        return send(res, 200, "application/json", JSON.stringify({ ok: false, error: String(e.message || e).slice(0, 240) }));
+      }
+    }
+
 
     // ---------- 社媒登录态 ----------
     if (url.pathname === "/api/social/status" && req.method === "GET") {
