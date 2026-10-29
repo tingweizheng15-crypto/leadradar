@@ -102,16 +102,19 @@ export const MAIL_GUIDES = {
     note: "服务器 smtp.163.com、端口 465、SSL —— 已经自动填好。",
   },
   gmail: {
-    title: "Gmail：要「应用专用密码」",
+    title: "Gmail：要「应用专用密码」，且必须先开两步验证",
     steps: [
-      "先给 Google 账号开启两步验证（没开就没有应用密码入口）",
-      "打开 myaccount.google.com/apppasswords",
+      "先开「两步验证」：打开 myaccount.google.com/security → 两步验证 → 按提示开启（没开这一步，应用密码页就会显示「此设置不适用于您的账户」）",
+      "开好后再打开 myaccount.google.com/apppasswords",
       "随便起个名字（比如 LeadRadar），点「创建」",
-      "复制弹出的 16 位密码（不含空格）",
-      "粘到上面的「授权码」框里",
+      "复制弹出的 16 位密码（去掉空格），粘到上面",
     ],
     url: "https://myaccount.google.com/apppasswords",
-    note: "Gmail 直连在国内可能不通，需要能访问 Google 的网络环境；服务器 smtp.gmail.com:465。",
+    extraUrl: "https://myaccount.google.com/security",
+    extraLabel: "先去开两步验证",
+    warn: "如果你看到的是「您要查找的设置不适用于您的账户」，只有三种可能：① 两步验证还没开（最常见）；② 这是公司/学校的 Google Workspace 账号，管理员禁用了应用密码；③ 账号开了「高级保护计划」。②③ 改不了，直接用 QQ / 163 邮箱。",
+    caution: "拿开发信来说，Gmail 是最麻烦的一条路：要先开两步验证，而且 smtp.gmail.com 在国内多数网络连不上。建议直接用 QQ 或 163 邮箱。",
+    note: "服务器 smtp.gmail.com、端口 465、SSL。",
   },
   outlook: {
     title: "Outlook / Hotmail：多半要「应用密码」",
@@ -122,6 +125,8 @@ export const MAIL_GUIDES = {
       "复制生成的密码，粘到上面",
     ],
     url: "https://account.microsoft.com/security",
+    warn: "如果「应用密码」这一项不存在：说明账号没开两步验证，或这是公司/学校的 Microsoft 365 账号（管理员可能禁用了 SMTP AUTH）。后者只能用 QQ / 163。",
+    caution: "Outlook 的 SMTP 在国内一般能连，但企业账号常被管理员关掉发信权限；不行就换 QQ / 163。",
     note: "服务器 smtp-mail.outlook.com、端口 587、STARTTLS —— 已经自动填好。",
   },
   icloud: {
@@ -158,6 +163,7 @@ export const MAIL_GUIDES = {
   },
   other: {
     title: "企业邮箱 / 其他邮箱：两样东西就够",
+    tip: "国内最省事的是 QQ 邮箱（免费，几分钟开通）或 163 邮箱；Gmail 在国内又慢又要两步验证，不建议用它发开发信。",
     steps: [
       "先用你平时登录网页版的邮箱和密码试一次——很多邮箱直接就能登",
       "如果提示 535 / 认证失败：这东西叫「授权码」「客户端授权密码」「应用专用密码」，各家叫法不同，去邮箱设置的「POP3/SMTP/IMAP」里开启并生成",

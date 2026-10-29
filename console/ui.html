@@ -98,6 +98,8 @@
   .guide ol{margin:6px 0 0;padding-left:20px}
   .guide li{margin:2px 0}
   .guide .gfoot{margin-top:8px;color:var(--ink3);font-size:11px}
+  .guide .gtip{margin:2px 0 6px;padding:7px 10px;border-radius:7px;background:#eff6ff;color:#1d4ed8;font-size:11.5px}
+  .guide .gwarn{margin-top:8px;padding:8px 10px;border-radius:7px;background:#fffbeb;color:#92400e;font-size:11.5px;line-height:1.8}
   @media(max-width:860px){.detect{margin-left:0}}
   .vrow{display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid #f4f6fa;font-size:12px}
   .vrow:last-child{border-bottom:none}
@@ -737,9 +739,14 @@ function showGuide(key){
   const box = $("#mGuide");
   box.hidden = false;
   box.innerHTML = `<h4>${esc(g.title)}</h4>
+    ${g.tip?`<div class="gtip">${esc(g.tip)}</div>`:""}
     <ol>${(g.steps||[]).map(s=>`<li>${esc(s)}</li>`).join("")}</ol>
+    ${g.warn?`<div class="gwarn">⚠ ${esc(g.warn)}</div>`:""}
     <div class="gfoot">${esc(g.note||"")}</div>
-    ${g.url?`<div style="margin-top:8px"><button class="ghost" data-open="${esc(g.url)}">打开设置页 ↗</button></div>`:""}`;
+    ${g.url?`<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="ghost" data-open="${esc(g.url)}">打开设置页 ↗</button>
+      ${g.extraUrl?`<button class="ghost" data-open="${esc(g.extraUrl)}">${esc(g.extraLabel||"打开")} ↗</button>`:""}
+    </div>`:""}`;
   box.querySelectorAll("[data-open]").forEach(b=>{ b.onclick = ()=>window.open(b.dataset.open, "_blank", "noopener"); });
 }
 
@@ -765,9 +772,11 @@ function updateDetect(fill){
       $("#mSecure").value = p.secure ? "ssl" : "starttls";
     }
     el.className = "detect ok";
+    const g = (MAIL.guides||{})[p.guide] || {};
     el.innerHTML = `✓ 识别为 <b>${esc(p.label||d)}</b> · 服务器 <code>${esc(p.host)}</code> · 端口 <code>${p.port}</code> · ${p.secure?"SSL":"STARTTLS"}
       <span style="color:var(--ink2)">（已自动填好，不用改）</span><br>
-      <span style="color:var(--ink3)">这个邮箱要用「授权码」而不是网页密码，点「授权码怎么拿？」看步骤</span>`;
+      <span style="color:var(--ink3)">这个邮箱要用「授权码」而不是网页密码，点「授权码怎么拿？」看步骤</span>`
+      + (g.caution ? `<div style="margin-top:5px;color:#b45309">⚠ ${esc(g.caution)}</div>` : "");
   } else if($("#mHost").value.trim()){
     el.className = "detect";
     el.innerHTML = `<b>${esc(d)}</b> 不在常见列表里，当前用 <code>${esc($("#mHost").value.trim())}:${esc($("#mPort").value||"465")}</code>
