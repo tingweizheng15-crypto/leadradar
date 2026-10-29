@@ -23,8 +23,8 @@ import { PLATFORMS, profileState, launchLogin, checkLogin, loginStatus, dumpDom 
 import { fetchProfile } from "../src/socialfetch.mjs";
 import { translateKeywords } from "../src/translate.mjs";
 import {
-  MAIL_PRESETS, FINDER_PROVIDERS, finderProvider, mailPreset,
-  smtpConfig, smtpLogin, verifyAddresses, sendMail, testFinder,
+  MAIL_PRESETS, MAIL_GUIDES, FINDER_PROVIDERS, finderProvider, mailPreset, guideFor,
+  smtpConfig, smtpLogin, verifyAddresses, sendMail, testFinder, guessSmtpHost,
 } from "../src/mailer.mjs";
 
 /** 操作台预览要用和流水线完全一致的预算分配，否则显示的条数是假的 */
@@ -277,7 +277,7 @@ function smtpPayload(env) {
     name: sm.name,
     passSet: !!sm.pass,
     ready: sm.ready,
-    preset: preset ? { domain: preset.domain, hint: preset.hint, web: preset.web, guessed: !!preset.guessed } : null,
+    preset: preset ? { domain: preset.domain, hint: preset.hint, web: preset.web, guessed: !!preset.guessed, guide: preset.guide || "other" } : null,
   };
 }
 
@@ -301,6 +301,7 @@ function mailStatePayload() {
     smtp: smtpPayload(env),
     lastLogin: lastSmtpLogin,
     presets: MAIL_PRESETS,
+    guides: MAIL_GUIDES,
   };
 }
 
@@ -496,6 +497,23 @@ const server = http.createServer(async (req, res) => {
       } catch (e) {
         return send(res, 200, "application/json", JSON.stringify({ ok: false, error: String(e.message || e).slice(0, 200) }));
       }
+    }
+
+    // 用户不知道服务器地址时：按域名并发探测常见 SMTP 地址，只读 220 问候，不发账号
+    if (url.pathname === "/api/mail/guess" && req.method === "POST") {
+      try {
+        const body = JSON.parse((await readBody(req)) || "{}");
+        const r = await guessSmtpHost(body.email || "");
+        return send(res, 200, "application/json", JSON.stringify(r));
+      } catch (e) {
+        return send(res, 200, "application/json", JSON.stringify({ ok: false, error: String(e.message || e).slice(0, 200) }));
+      }
+    }
+
+    // 这一步该怎么操作（授权码在哪、点哪里）
+    if (url.pathname === "/api/mail/guide" && req.method === "POST") {
+      const body = JSON.parse((await readBody(req)) || "{}");
+      return send(res, 200, "application/json", JSON.stringify({ ok: true, guide: guideFor(body.email || "") }));
     }
 
     // 登录测试：真连 SMTP、真 AUTH；成功才写入 .env

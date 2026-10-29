@@ -58,6 +58,8 @@ export function mailPreset(email) {
   if (MAIL_PRESETS[domain]) return { domain, guessed: false, ...MAIL_PRESETS[domain] };
   return {
     domain,
+    label: domain,
+    guide: "other",
     host: `smtp.${domain}`,
     port: 465,
     secure: true,
@@ -66,6 +68,212 @@ export function mailPreset(email) {
     hint: "域名认不出来，按 smtp.<域名>:465 猜的；企业邮请改成服务商地址（腾讯企业邮 smtp.exmail.qq.com / 阿里企业邮 smtp.qiye.aliyun.com / 网易企业邮 smtp.qiye.163.com）",
   };
 }
+
+/* ------------------------------------------------------------------ *
+ * 「授权码怎么拿」逐步指引
+ *
+ * 用户真正卡住的不是服务器地址，而是「为什么要授权码」「去哪点」。
+ * 这里把每一家的操作路径写清楚，前端按域名自动显示对应那一条。
+ * ------------------------------------------------------------------ */
+
+export const MAIL_GUIDES = {
+  qq: {
+    title: "QQ 邮箱：要「授权码」，不是 QQ 密码",
+    steps: [
+      "打开 mail.qq.com 登录你的 QQ 邮箱（手机 QQ 邮箱 App 也行）",
+      "点顶部「设置」→「账号」",
+      "找到「POP3/IMAP/SMTP 服务」，点「开启」",
+      "按提示用手机发短信 / 扫码验证",
+      "页面会给你一串 16 位「授权码」，复制它（只显示一次）",
+    ],
+    url: "https://mail.qq.com",
+    note: "服务器 smtp.qq.com、端口 465、SSL —— 这些已经自动填好，你不用管。",
+  },
+  netease: {
+    title: "163 / 126 邮箱：要「客户端授权密码」",
+    steps: [
+      "打开 mail.163.com（或 mail.126.com）登录",
+      "顶部「设置」→「POP3/SMTP/IMAP」",
+      "把「SMTP 服务」打开（会要求手机验证）",
+      "点「新增授权密码」，记下那串密码",
+      "把它粘到上面的「授权码」框里",
+    ],
+    url: "https://mail.163.com",
+    note: "服务器 smtp.163.com、端口 465、SSL —— 已经自动填好。",
+  },
+  gmail: {
+    title: "Gmail：要「应用专用密码」",
+    steps: [
+      "先给 Google 账号开启两步验证（没开就没有应用密码入口）",
+      "打开 myaccount.google.com/apppasswords",
+      "随便起个名字（比如 LeadRadar），点「创建」",
+      "复制弹出的 16 位密码（不含空格）",
+      "粘到上面的「授权码」框里",
+    ],
+    url: "https://myaccount.google.com/apppasswords",
+    note: "Gmail 直连在国内可能不通，需要能访问 Google 的网络环境；服务器 smtp.gmail.com:465。",
+  },
+  outlook: {
+    title: "Outlook / Hotmail：多半要「应用密码」",
+    steps: [
+      "打开 account.microsoft.com/security 登录",
+      "进入「高级安全选项」",
+      "找到「应用密码」，点「创建新的应用密码」",
+      "复制生成的密码，粘到上面",
+    ],
+    url: "https://account.microsoft.com/security",
+    note: "服务器 smtp-mail.outlook.com、端口 587、STARTTLS —— 已经自动填好。",
+  },
+  icloud: {
+    title: "iCloud 邮箱：要「App 专用密码」",
+    steps: [
+      "打开 appleid.apple.com 登录",
+      "进入「登录与安全」→「App 专用密码」",
+      "点「生成密码」，复制那串 xxxx-xxxx-xxxx-xxxx",
+      "粘到上面的「授权码」框里",
+    ],
+    url: "https://appleid.apple.com",
+    note: "服务器 smtp.mail.me.com、端口 587、STARTTLS。",
+  },
+  yahoo: {
+    title: "Yahoo 邮箱：要 App Password",
+    steps: [
+      "打开 account.yahoo.com 登录",
+      "进入「账户安全」→「生成应用密码」",
+      "复制生成的密码，粘到上面",
+    ],
+    url: "https://account.yahoo.com",
+    note: "服务器 smtp.mail.yahoo.com:465。",
+  },
+  aliyun: {
+    title: "阿里邮箱：开启 SMTP 并用客户端密码",
+    steps: [
+      "打开 mail.aliyun.com 登录",
+      "「设置」→「账户与安全」→「客户端设置」",
+      "开启 SMTP 服务，生成「客户端密码」",
+      "把客户端密码粘到上面",
+    ],
+    url: "https://mail.aliyun.com",
+    note: "服务器 smtp.aliyun.com:465。",
+  },
+  other: {
+    title: "企业邮箱 / 其他邮箱：两样东西就够",
+    steps: [
+      "先用你平时登录网页版的邮箱和密码试一次——很多邮箱直接就能登",
+      "如果提示 535 / 认证失败：这东西叫「授权码」「客户端授权密码」「应用专用密码」，各家叫法不同，去邮箱设置的「POP3/SMTP/IMAP」里开启并生成",
+      "不知道服务器地址：展开下面「高级」，点「自动找服务器」，工具会自己探测",
+      "公司邮箱：直接问 IT / 管理员要「SMTP 服务器 + 端口 + 客户端专用密码」",
+    ],
+    url: "",
+    note: "不需要自己搭邮件服务器——用你已有的 QQ / 163 / Gmail / 公司邮箱就行。",
+  },
+};
+
+// 域名 → 指引类别
+const GUIDE_OF = {
+  "qq.com": "qq", "foxmail.com": "qq", "vip.qq.com": "qq",
+  "163.com": "netease", "126.com": "netease", "yeah.net": "netease",
+  "gmail.com": "gmail", "googlemail.com": "gmail",
+  "outlook.com": "outlook", "hotmail.com": "outlook", "live.com": "outlook", "msn.com": "outlook",
+  "icloud.com": "icloud", "me.com": "icloud", "mac.com": "icloud",
+  "yahoo.com": "yahoo",
+  "aliyun.com": "aliyun",
+};
+
+// 域名 → 给人看的名字（前端显示「识别为 QQ 邮箱」）
+const LABEL_OF = {
+  "qq.com": "QQ 邮箱", "foxmail.com": "Foxmail 邮箱", "vip.qq.com": "QQ VIP 邮箱",
+  "163.com": "163 邮箱", "126.com": "126 邮箱", "yeah.net": "Yeah 邮箱",
+  "sina.com": "新浪邮箱", "sina.cn": "新浪邮箱", "sohu.com": "搜狐邮箱",
+  "139.com": "139 邮箱", "189.cn": "189 邮箱", "aliyun.com": "阿里邮箱",
+  "gmail.com": "Gmail", "googlemail.com": "Gmail",
+  "outlook.com": "Outlook", "hotmail.com": "Hotmail", "live.com": "Outlook", "msn.com": "Outlook",
+  "icloud.com": "iCloud 邮箱", "me.com": "iCloud 邮箱", "mac.com": "iCloud 邮箱",
+  "yahoo.com": "Yahoo 邮箱", "yandex.com": "Yandex 邮箱", "zoho.com": "Zoho 邮箱",
+};
+
+for (const [domain, p] of Object.entries(MAIL_PRESETS)) {
+  p.guide = GUIDE_OF[domain] || "other";
+  p.label = LABEL_OF[domain] || domain;
+}
+
+export function guideFor(email) {
+  const domain = String(email || "").split("@")[1]?.trim().toLowerCase() || "";
+  const key = GUIDE_OF[domain] || "other";
+  return { key, ...MAIL_GUIDES[key] };
+}
+
+/* ------------------------------------------------------------------ *
+ * 服务器自动探测
+ *
+ * 「服务器我没有 / 端口加密不懂」是真实门槛。多数个人邮箱都能靠域名猜出来，
+ * 猜不出来（公司邮箱）就并发试几个常见地址，谁能回 220 问候就用谁。
+ * 只读问候语，不发送任何账号信息，探测本身无副作用。
+ * ------------------------------------------------------------------ */
+
+function probeSmtp(host, port, secure, timeout = 4500) {
+  return new Promise((resolve) => {
+    const t0 = Date.now();
+    let done = false;
+    let sock = null;
+    const finish = (banner) => {
+      if (done) return;
+      done = true;
+      try { sock?.destroy(); } catch { /* ignore */ }
+      resolve(banner ? { host, port, secure, ms: Date.now() - t0, banner } : null);
+    };
+    try {
+      sock = secure
+        ? tls.connect({ host, port, servername: host, rejectUnauthorized: false }, () => {})
+        : net.connect({ host, port }, () => {});
+    } catch {
+      return resolve(null);
+    }
+    sock.setTimeout(timeout, () => finish(null));
+    sock.on("error", () => finish(null));
+    sock.on("data", (d) => {
+      const m = d.toString("utf8").match(/^220[ -]([^\r\n]{0,90})/);
+      finish(m ? m[1].trim() : null);
+    });
+  });
+}
+
+/**
+ * @returns {Promise<{ok:boolean, domain:string, best:object|null, results:object[], note:string}>}
+ */
+export async function guessSmtpHost(email) {
+  const domain = String(email || "").split("@")[1]?.trim().toLowerCase() || "";
+  if (!domain) throw new Error("先填邮箱地址，工具才知道去猜哪家的服务器");
+  const preset = MAIL_PRESETS[domain];
+  const cands = [];
+  const add = (host, port, secure, via) => {
+    if (!host) return;
+    if (cands.some((c) => c.host === host && c.port === port)) return;
+    cands.push({ host, port, secure, via });
+  };
+  if (preset) add(preset.host, preset.port, preset.secure, "内置预设");
+  add(`smtp.${domain}`, 465, true, "猜 smtp.<域名>:465");
+  add(`smtp.${domain}`, 587, false, "猜 smtp.<域名>:587");
+  add(`mail.${domain}`, 465, true, "猜 mail.<域名>:465");
+  add(`smtp.${domain}`, 25, false, "猜 smtp.<域名>:25");
+
+  const results = (await Promise.all(cands.map((c) => probeSmtp(c.host, c.port, c.secure)))).filter(Boolean);
+  const withVia = results.map((r) => ({ ...r, via: cands.find((c) => c.host === r.host && c.port === r.port)?.via || "" }));
+  withVia.sort((a, b) => {
+    const pri = (x) => (x.via === "内置预设" ? 0 : 1);
+    return pri(a) - pri(b) || a.ms - b.ms;
+  });
+  return {
+    ok: withVia.length > 0,
+    domain,
+    best: withVia[0] || null,
+    results: withVia,
+    note: withVia.length
+      ? "找到一个能应答的服务器，已自动填上；点「登录测试」验证账号"
+      : "常见地址都没应答。公司邮箱请问 IT 要 SMTP 地址；也可能是网络/端口被公司网络挡住了",
+  };
+}
+
 
 /* ------------------------------------------------------------------ *
  * 邮箱查找服务（找客户邮箱）

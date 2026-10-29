@@ -90,6 +90,15 @@
   .mstate{font-size:11.5px;line-height:1.95;margin-top:9px;color:var(--ink2)}
   .mstate .step{display:flex;gap:8px}
   .mstate .step b{flex:0 0 42px;color:var(--ink3);font-weight:500}
+  .detect{font-size:11.5px;line-height:1.8;padding:9px 12px;border-radius:9px;background:#f8fafc;border:1px solid #e8eef6;color:var(--ink2);margin-left:160px}
+  .detect.ok{background:#f0fdf4;border-color:#bbf7d0;color:#15803d}
+  .detect.warn{background:#fffbeb;border-color:#fde68a;color:#b45309}
+  .guide{background:#f8fafc;border:1px solid #e8eef6;border-radius:10px;padding:12px 14px;margin-top:10px;font-size:12px;line-height:1.9;color:var(--ink2)}
+  .guide h4{margin:0 0 4px;font-size:12px;color:var(--ink)}
+  .guide ol{margin:6px 0 0;padding-left:20px}
+  .guide li{margin:2px 0}
+  .guide .gfoot{margin-top:8px;color:var(--ink3);font-size:11px}
+  @media(max-width:860px){.detect{margin-left:0}}
   .vrow{display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid #f4f6fa;font-size:12px}
   .vrow:last-child{border-bottom:none}
   .vtag{font-size:10px;padding:1px 7px;border-radius:5px;flex:0 0 auto}
@@ -199,26 +208,46 @@
 
     <div class="mbox">
       <div class="mhead">② 你的发信邮箱 · SMTP 登录 <span class="mtag" id="mBadge">未登录</span></div>
-      <div class="row"><label>邮箱地址</label><input id="mUser" placeholder="you@company.com" autocomplete="username" spellcheck="false"></div>
-      <div class="row"><label>密码 / 授权码</label><input id="mPass" type="password" placeholder="多数邮箱要用授权码，不是网页登录密码" autocomplete="current-password"></div>
-      <div class="row"><label>服务器</label><input id="mHost" placeholder="自动识别，如 smtp.qq.com" spellcheck="false"></div>
-      <div class="row"><label>端口 / 加密</label>
-        <div style="display:flex;gap:8px">
-          <input id="mPort" inputmode="numeric" style="max-width:110px" placeholder="465">
-          <select id="mSecure" style="max-width:200px">
-            <option value="ssl">SSL（465，最常见）</option>
-            <option value="starttls">STARTTLS（587）</option>
-          </select>
-        </div>
+      <div class="kvsub" style="margin:0 0 10px;font-size:11.5px">
+        用你已有的邮箱就行（QQ / 163 / Gmail / 公司邮箱都行），<b>不需要自己搭邮件服务器</b>。
+        服务器、端口、加密这些工具会自动填好，你只要填 <b>邮箱</b> 和 <b>授权码</b>。
       </div>
-      <div class="kvsub" id="mPresetHint" style="margin-left:160px"></div>
+
+      <div class="row"><label>邮箱地址</label><input id="mUser" placeholder="例如 123456@qq.com" autocomplete="username" spellcheck="false"></div>
+      <div class="row"><label>授权码 / 密码</label><input id="mPass" type="password" placeholder="QQ / 163 要「授权码」，Gmail 要「应用专用密码」" autocomplete="current-password"></div>
+
+      <div class="detect" id="mDetect">填完邮箱，这里会显示是哪家邮箱、用哪个服务器</div>
+
       <div class="btns" style="margin-top:10px">
         <button class="primary" id="b-mLogin">登录测试</button>
-        <button class="ghost" id="b-mSave">只保存不测试</button>
-        <button class="ghost" id="b-mSend">发一封测试邮件</button>
+        <button class="ghost" id="b-mHelp">授权码怎么拿？</button>
+        <button class="ghost" id="b-mSend">发测试邮件</button>
         <button class="ghost" id="b-mWeb">打开网页邮箱</button>
       </div>
+
+      <div class="guide" id="mGuide" hidden></div>
       <div class="mstate" id="mState"></div>
+
+      <details style="margin-top:10px">
+        <summary style="font-size:11.5px;color:var(--ink3);cursor:pointer;outline:none">高级：服务器 / 端口 / 加密（一般不用动，自动识别失败时才看这里）</summary>
+        <div style="margin-top:10px">
+          <div class="row"><label>服务器</label><input id="mHost" placeholder="自动识别，如 smtp.qq.com" spellcheck="false"></div>
+          <div class="row"><label>端口 / 加密</label>
+            <div style="display:flex;gap:8px">
+              <input id="mPort" inputmode="numeric" style="max-width:110px" placeholder="465">
+              <select id="mSecure" style="max-width:200px">
+                <option value="ssl">SSL（465，最常见）</option>
+                <option value="starttls">STARTTLS（587）</option>
+              </select>
+            </div>
+          </div>
+          <div class="btns">
+            <button class="ghost" id="b-mGuess">自动找服务器</button>
+            <button class="ghost" id="b-mSave">只保存不测试</button>
+          </div>
+          <div class="mstate" id="mGuessState"></div>
+        </div>
+      </details>
     </div>
 
     <div class="mbox">
@@ -625,13 +654,14 @@ $("#b-sfetch").onclick = async ()=>{
 };
 
 // ---------- 邮箱：查找服务 + 发信登录 ----------
-const MAIL = { state: null, presets: {}, providers: [] };
+const MAIL = { state: null, presets: {}, guides: {}, providers: [] };
 
 async function loadMail(){
   try{
     const s = await api("/api/mail/state");
     MAIL.state = s;
     MAIL.presets = s.presets || {};
+    MAIL.guides = s.guides || {};
     MAIL.providers = s.finder.providers || [];
     renderFinder(s.finder);
     renderSmtp(s.smtp);
@@ -682,14 +712,70 @@ function renderFinderFields(f){
 function renderSmtp(s){
   $("#mUser").value = s.user || "";
   $("#mPass").value = "";
-  $("#mPass").placeholder = s.passSet ? "已保存，留空不修改" : "授权码 / 应用专用密码";
+  $("#mPass").placeholder = s.passSet ? "已保存，留空不修改" : "QQ / 163 要「授权码」，Gmail 要「应用专用密码」";
   $("#mHost").value = s.host || "";
   $("#mPort").value = s.port || "";
   $("#mSecure").value = s.secure ? "ssl" : "starttls";
-  $("#mPresetHint").textContent = s.preset ? s.preset.hint : "";
   const badge = $("#mBadge");
   badge.textContent = s.ready ? "已登录" : "未登录";
   badge.className = "mtag " + (s.ready ? "on" : "off");
+  updateDetect(false);
+}
+
+function mailDomain(email){
+  return (String(email||"").split("@")[1] || "").trim().toLowerCase();
+}
+
+function guideKeyOf(email){
+  const p = (MAIL.presets||{})[mailDomain(email)];
+  return (p && p.guide) || "other";
+}
+
+function showGuide(key){
+  const g = (MAIL.guides||{})[key] || (MAIL.guides||{}).other;
+  if(!g) return;
+  const box = $("#mGuide");
+  box.hidden = false;
+  box.innerHTML = `<h4>${esc(g.title)}</h4>
+    <ol>${(g.steps||[]).map(s=>`<li>${esc(s)}</li>`).join("")}</ol>
+    <div class="gfoot">${esc(g.note||"")}</div>
+    ${g.url?`<div style="margin-top:8px"><button class="ghost" data-open="${esc(g.url)}">打开设置页 ↗</button></div>`:""}`;
+  box.querySelectorAll("[data-open]").forEach(b=>{ b.onclick = ()=>window.open(b.dataset.open, "_blank", "noopener"); });
+}
+
+/** 填完邮箱就告诉他「这是哪家、用哪个服务器」，并把高级里的字段悄悄填好 */
+function updateDetect(fill){
+  const email = $("#mUser").value.trim();
+  const d = mailDomain(email);
+  const el = $("#mDetect");
+  if(!el) return;
+  if(!d){
+    el.className = "detect";
+    el.textContent = "填完邮箱，这里会显示是哪家邮箱、用哪个服务器";
+    return;
+  }
+  const p = (MAIL.presets||{})[d];
+  if(p){
+    // 只在「没填过」或「当前值是别的邮箱自动填的」时覆盖，避免冲掉用户手改的地址
+    const known = new Set(Object.values(MAIL.presets||{}).map(x=>x.host));
+    const cur = $("#mHost").value.trim();
+    if(fill && (!cur || known.has(cur))){
+      $("#mHost").value = p.host;
+      $("#mPort").value = p.port;
+      $("#mSecure").value = p.secure ? "ssl" : "starttls";
+    }
+    el.className = "detect ok";
+    el.innerHTML = `✓ 识别为 <b>${esc(p.label||d)}</b> · 服务器 <code>${esc(p.host)}</code> · 端口 <code>${p.port}</code> · ${p.secure?"SSL":"STARTTLS"}
+      <span style="color:var(--ink2)">（已自动填好，不用改）</span><br>
+      <span style="color:var(--ink3)">这个邮箱要用「授权码」而不是网页密码，点「授权码怎么拿？」看步骤</span>`;
+  } else if($("#mHost").value.trim()){
+    el.className = "detect";
+    el.innerHTML = `<b>${esc(d)}</b> 不在常见列表里，当前用 <code>${esc($("#mHost").value.trim())}:${esc($("#mPort").value||"465")}</code>
+      —— 连不上就点下面「自动找服务器」`;
+  } else {
+    el.className = "detect warn";
+    el.innerHTML = `<b>${esc(d)}</b> 没认出来是哪家邮箱。点下面「自动找服务器」让工具试一遍（只探测 220 问候，不发送账号）`;
+  }
 }
 
 function mailSteps(sel, r, okText){
@@ -767,23 +853,45 @@ $("#b-mfGrab").onclick = async ()=>{
 };
 
 // 按域名自动填服务器：qq/163/gmail 这些常见邮箱直接给对，省得用户查
-$("#mUser").addEventListener("blur", ()=>{
-  const email = $("#mUser").value.trim();
-  const domain = (email.split("@")[1]||"").toLowerCase();
-  if(!domain) return;
-  const p = MAIL.presets[domain];
-  if(p){
-    if(!$("#mHost").value.trim()) $("#mHost").value = p.host;
-    $("#mPort").value = p.port;
-    $("#mSecure").value = p.secure ? "ssl" : "starttls";
-    $("#mPresetHint").textContent = p.hint || "";
-  } else if(!$("#mHost").value.trim()){
-    $("#mHost").value = "smtp." + domain;
-    $("#mPort").value = 465;
-    $("#mSecure").value = "ssl";
-    $("#mPresetHint").textContent = "域名没认出来，按 smtp.<域名>:465 猜的；企业邮请换成服务商地址（腾讯企业邮 smtp.exmail.qq.com / 阿里企业邮 smtp.qiye.aliyun.com）。";
-  }
+$("#mUser").addEventListener("blur", ()=>updateDetect(true));
+$("#mUser").addEventListener("input", ()=>{
+  clearTimeout(window._mdT);
+  window._mdT = setTimeout(()=>updateDetect(true), 350);
 });
+
+$("#b-mHelp").onclick = ()=>{
+  const box = $("#mGuide");
+  if(!box.hidden && box.dataset.key === guideKeyOf($("#mUser").value)){
+    box.hidden = true;
+    return;
+  }
+  box.dataset.key = guideKeyOf($("#mUser").value);
+  showGuide(guideKeyOf($("#mUser").value));
+};
+
+// 不知道服务器地址时的兜底：并发探测 smtp.<域名> / mail.<域名> 的常见端口
+$("#b-mGuess").onclick = async ()=>{
+  const email = $("#mUser").value.trim();
+  if(!mailDomain(email)){ toast("先填邮箱地址"); $("#mUser").focus(); return; }
+  const btn = $("#b-mGuess"); btn.disabled = true;
+  $("#mGuessState").innerHTML = '<span style="color:var(--ink3)">正在探测常见服务器…（最多 5 秒，只读问候语）</span>';
+  try{
+    const r = await api("/api/mail/guess", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ email }) });
+    if(r.ok && r.best){
+      $("#mHost").value = r.best.host;
+      $("#mPort").value = r.best.port;
+      $("#mSecure").value = r.best.secure ? "ssl" : "starttls";
+      $("#mGuessState").innerHTML = `<span style="color:var(--ok)">✓ 用 ${esc(r.best.host)}:${r.best.port}（${r.best.secure?"SSL":"STARTTLS"} · ${r.best.ms}ms 应答）</span>`
+        + (r.results.length>1 ? `<div style="color:var(--ink3)">其他可用：${r.results.slice(1,4).map(x=>esc(x.host+":"+x.port)).join("、")}</div>` : "")
+        + `<div style="color:var(--ink3)">现在点上面的「登录测试」验证账号密码</div>`;
+      updateDetect(false);
+    } else {
+      $("#mGuessState").innerHTML = `<span style="color:var(--bad)">✕ ${esc(r.note || r.error || "没探测到可用服务器")}</span>
+        <div style="color:var(--ink3)">公司邮箱请直接问 IT 要 SMTP 地址；也可能是公司网络挡了 25/465/587 端口</div>`;
+    }
+  }catch(e){ $("#mGuessState").innerHTML = `<span style="color:var(--bad)">✕ ${esc(String(e.message||e))}</span>`; }
+  finally{ btn.disabled = false; }
+};
 
 $("#b-mLogin").onclick = async ()=>{
   const body = smtpForm();
@@ -795,6 +903,11 @@ $("#b-mLogin").onclick = async ()=>{
     const r = await api("/api/mail/smtp/login", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body) });
     mailSteps("#mState", r, "登录成功，已写入 .env");
     if(r.ok){ toast("登录成功"); await loadMail(); loadStatus(); }
+    else if(/535|授权码|认证|密码|login/i.test(r.error||"")) {
+      // 认证失败九成是「用了网页密码」而不是授权码：直接把步骤摊开给他看
+      showGuide(guideKeyOf(body.user));
+      toast("多半是用了网页密码 —— 这里要「授权码」");
+    }
   }catch(e){ $("#mState").innerHTML = `<span style="color:var(--bad)">✕ ${esc(String(e.message||e))}</span>`; }
   finally{ btn.disabled = false; }
 };

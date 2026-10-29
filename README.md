@@ -199,7 +199,13 @@ npm run build:exe -- --no-desktop   # 只留在 dist/
 
 **② 你的发信邮箱 · SMTP 登录**
 
-填邮箱地址后，服务器/端口会按域名自动识别（QQ、163、126、Gmail、Outlook、iCloud、阿里、腾讯企业邮等内置预设），点「登录测试」会真的连 SMTP、真的 AUTH：
+不需要自己搭邮件服务器：用现成的 QQ / 163 / Gmail / 公司邮箱就行。页面上只暴露两个输入框——邮箱地址 + 授权码，其余全部自动：
+
+- 填完邮箱立刻显示「识别为 QQ 邮箱 · smtp.qq.com · 465 · SSL」，并自动填进高级里的服务器/端口/加密
+- 「授权码怎么拿？」按域名给出逐步路径（QQ、163/126、Gmail、Outlook、iCloud、Yahoo、阿里…），带直达设置页的按钮
+- 认不出的域名（公司邮箱）点「自动找服务器」：并发探测 `smtp.<域名>` 的 465/587/25 与 `mail.<域名>`:465，只读 `220` 问候语、不发任何账号信息，谁能应答就用谁
+
+点「登录测试」会真的连 SMTP、真的 AUTH：
 
 ```
 连接 smtp.qq.com:465 · SSL → 220 ...
@@ -207,7 +213,7 @@ npm run build:exe -- --no-desktop   # 只留在 dist/
 登录 AUTH PLAIN → 235 认证成功
 ```
 
-成功才写入 `.env`（`SMTP_USER / SMTP_PASS / SMTP_HOST / SMTP_PORT / SMTP_SECURE / SMTP_FROM`），失败会指出卡在哪一步。常见坑已经翻译成人话：网易/QQ 要「授权码」、Gmail 要「应用专用密码」、Outlook 走 587 STARTTLS、自建服务器证书问题可设 `LR_TLS_INSECURE=1`。
+成功才写入 `.env`（`SMTP_USER / SMTP_PASS / SMTP_HOST / SMTP_PORT / SMTP_SECURE / SMTP_FROM`），失败会指出卡在哪一步，并自动把「授权码怎么拿」摊开。常见坑已经翻译成人话：网易/QQ 要「授权码」、Gmail 要「应用专用密码」、Outlook 走 587 STARTTLS、自建服务器证书问题可设 `LR_TLS_INSECURE=1`。
 
 登录成功后可以「发一封测试邮件」给自己，验证整条链路（也顺手确认不进垃圾箱）。
 
