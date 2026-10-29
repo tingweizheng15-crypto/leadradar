@@ -167,6 +167,29 @@
     <h2>检索词（决定能搜到什么客户）</h2>
     <div class="hint" id="qSummary" style="margin:0 0 12px">加载中…</div>
 
+    <div style="border:1px solid #e3eaf3;border-radius:10px;padding:12px 14px;margin-bottom:14px;background:#fafcff">
+      <div style="font-weight:600;font-size:12.5px;margin-bottom:4px">中文关键词 → 本地语 <span style="font-weight:400;color:var(--ink3)">（建议先走这一步）</span></div>
+      <div class="kvsub" style="margin-bottom:10px">中文直接写，一行一条，例如「跑步压缩裤 批发」。会按目标国家的<b>真实搜索习惯</b>翻成本地语言，不是直译——韩国出「압축 레깅스 도매」，泰国出「กางเกงรัดกล้ามเนื้อ ขายส่ง」，印尼出「celana compression grosir」。</div>
+
+      <div class="row" style="align-items:flex-start"><label>中文关键词</label>
+        <textarea id="trInput" rows="3" spellcheck="false" placeholder="跑步压缩裤 批发&#10;运动背心 代工&#10;速干T恤 供应商"></textarea>
+      </div>
+
+      <div class="row"><label>目标市场</label>
+        <div id="trMarkets" style="display:flex;gap:14px;flex-wrap:wrap;padding-top:9px"></div>
+      </div>
+
+      <div class="btns" style="margin-top:8px">
+        <button class="primary" id="b-translate">翻译成本地语</button>
+        <button class="ghost" id="b-tapply">写入自定义检索式并保存</button>
+        <span class="kvsub" id="trState" style="margin:2px 0 0 4px"></span>
+      </div>
+
+      <div class="row" style="align-items:flex-start;margin-top:10px"><label>翻译结果（可改）</label>
+        <textarea id="trOut" rows="6" spellcheck="false" placeholder="翻译结果会出现在这里，一行一条，可以手工删改后再写入"></textarea>
+      </div>
+    </div>
+
     <div class="row"><label>检索式模板</label>
       <textarea id="qTemplates" rows="3" spellcheck="false" placeholder="{product} {buyer} {country}"></textarea>
     </div>
@@ -196,6 +219,34 @@
       <button class="ghost" id="b-qreset">恢复默认</button>
     </div>
     <div class="kvsub" id="qPreview" style="margin:10px 0 0;line-height:2"></div>
+  </div>
+
+  <div class="card cfg" id="socialCard" style="margin-bottom:14px">
+    <h2>社媒抓取（Instagram / TikTok / Facebook）</h2>
+    <div class="kvsub">Instagram 和 Facebook 不登录只能拿到登录墙。点下面的按钮，在弹出的 Chrome 窗口里登录一次，之后抓取自动复用这份登录态。登录完<b>请关掉那个窗口</b>，同一个目录不能同时开两个 Chrome。</div>
+
+    <div class="btns" style="margin-top:12px">
+      <button class="primary" data-login="all">一次打开三个登录页</button>
+      <button class="ghost" data-login="instagram">Instagram</button>
+      <button class="ghost" data-login="tiktok">TikTok</button>
+      <button class="ghost" data-login="facebook">Facebook</button>
+      <button class="ghost" id="b-scheck">重新检测登录态</button>
+    </div>
+    <div class="kvsub" id="socialState">登录目录：—</div>
+
+    <div style="margin-top:14px;padding-top:12px;border-top:1px solid #eef1f5">
+      <div class="kvsub" style="margin-bottom:6px">试抓一个账号，验证真的能拿到数据：</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <select id="sfPlatform" style="width:132px">
+          <option value="instagram">Instagram</option>
+          <option value="tiktok">TikTok</option>
+          <option value="facebook">Facebook</option>
+        </select>
+        <input id="sfHandle" placeholder="账号名，如 yokkao（不用打 @）">
+        <button class="primary" id="b-sfetch" style="white-space:nowrap">抓取</button>
+      </div>
+      <div id="sfResult" style="margin-top:10px;font-size:12px;line-height:1.9"></div>
+    </div>
   </div>
 
   <div class="card cfg" style="margin-bottom:14px">
@@ -419,6 +470,114 @@ function renderQueryPreview(q){
     : "还没有可用的检索式——模板可能被清空了。";
 }
 
+// ---------- 社媒登录与抓取 ----------
+const PLAT_LABEL = { instagram:"Instagram", tiktok:"TikTok", facebook:"Facebook" };
+
+async function loadSocialStatus(){
+  try{
+    const s = await api("/api/social/status");
+    const p = s.profile || {};
+    const L = s.login || {};
+    const keys = ["instagram","tiktok","facebook"];
+    const locked = !!L.locked;
+    const badges = keys.map(k=>{
+      if(locked) return `<span class="pill off" style="margin:0 6px 6px 0"><i></i>${PLAT_LABEL[k]} · 待检测</span>`;
+      return `<span class="pill ${L[k]?"on":"bad"}" style="margin:0 6px 6px 0"><i></i>${PLAT_LABEL[k]} · ${L[k]?"已登录":"未登录"}</span>`;
+    }).join("");
+    const missing = keys.filter(k=>!L[k]);
+    const tip = locked
+      ? `<div style="margin-top:8px;color:#b45309">Chrome 还开着，cookie 库被它独占，现在读不了。<b>登录完把窗口关掉</b>，再点「重新检测登录态」。</div>`
+      : (missing.length
+          ? `<div style="margin-top:8px;color:#b45309">还差 <b>${missing.map(k=>PLAT_LABEL[k]).join(" / ")}</b>。手机上必须点「确认登录」，电脑页面真的跳到首页才算成功；只扫不确认 = 只有匿名 cookie。</div>`
+          : `<div style="margin-top:8px;color:var(--ok)">三个平台都已登录，抓取会直接复用这份登录态。</div>`);
+    $("#socialState").innerHTML = badges
+      + `<div style="margin-top:8px">登录目录：<code>${esc(p.dir||"")}</code>${p.sizeMB?`　·　${p.sizeMB} MB`:""}${!locked && L.total!=null?`　·　有效 cookie ${L.total} 条`:""}</div>`
+      + tip;
+  }catch(e){ /* 忽略 */ }
+}
+
+document.querySelectorAll("[data-login]").forEach(btn=>{
+  btn.onclick = async ()=>{
+    const plat = btn.dataset.login;
+    btn.disabled = true;
+    const r = await api("/api/social/login", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ platform: plat }) });
+    btn.disabled = false;
+    if(r.ok) toast(plat==="all" ? "已打开三个平台的登录标签页" : `已打开 ${plat} 登录窗口：登录完请关掉窗口`);
+    else toast("打不开登录窗口：" + (r.error || "未知错误"));
+  };
+});
+
+$("#b-scheck").onclick = async ()=>{
+  await loadSocialStatus();
+  toast("已按 cookie 重新检测（秒级）");
+};
+
+$("#b-sfetch").onclick = async ()=>{
+  const platform = $("#sfPlatform").value;
+  const handle = $("#sfHandle").value.trim().replace(/^@/,"");
+  if(!handle){ toast("先填账号名，例如 yokkao"); return; }
+  $("#sfResult").innerHTML = `<span style="color:var(--ink3)">抓取中…（10-25 秒）</span>`;
+  const r = await api("/api/social/fetch", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ platform, handle }) });
+  if(r.ok){
+    const rows = [
+      ["名称", r.name], ["粉丝", r.followers], ["帖子/视频", r.posts],
+      ["点赞", r.likes], ["官网", r.website], ["邮箱", r.email], ["电话", r.phone],
+    ].filter(([,v]) => v && v !== 0);
+    $("#sfResult").innerHTML = `<div style="color:var(--ok);font-weight:600;margin-bottom:4px">✓ 抓到了</div>`
+      + rows.map(([k,v])=>`<div><span style="color:var(--ink3)">${k}：</span>${esc(String(v))}</div>`).join("")
+      + (r.bio ? `<div style="margin-top:4px;color:var(--ink2)">简介：${esc(r.bio)}</div>` : "");
+  } else {
+    $("#sfResult").innerHTML = `<div style="color:var(--bad)">✕ ${esc(r.error || "没抓到数据")}</div>`;
+  }
+};
+
+// ---------- 中文关键词 → 本地语 ----------
+const TR_MARKETS = { KR:"韩国", TH:"泰国", ID:"印尼", MY:"马来", US:"美国", UK:"英国" };
+
+function renderTrMarkets(){
+  const box = $("#trMarkets");
+  if(!box) return;
+  box.innerHTML = Object.entries(TR_MARKETS).map(([k,v])=>
+    `<label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--ink2);white-space:nowrap">
+       <input type="checkbox" value="${k}" checked style="width:auto;margin:0">${v} <span style="color:var(--ink3)">${k}</span>
+     </label>`
+  ).join("");
+}
+
+$("#b-translate").onclick = async ()=>{
+  const chinese = $("#trInput").value.trim();
+  if(!chinese){ toast("先输入中文关键词，一行一条"); $("#trInput").focus(); return; }
+  const markets = [...document.querySelectorAll("#trMarkets input:checked")].map(x=>x.value);
+  if(!markets.length){ toast("至少勾一个目标市场"); return; }
+  const btn = $("#b-translate");
+  btn.disabled = true;
+  $("#trState").textContent = "翻译中…（有大模型约 3-10 秒，没有则用内置词典，几乎立刻出）";
+  try{
+    const r = await api("/api/queries/translate", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ chinese, markets }) });
+    if(!r.ok){ $("#trState").textContent = ""; toast("翻译失败：" + (r.error || "未知错误")); return; }
+    const order = Object.keys(TR_MARKETS);
+    const items = (r.items||[]).slice().sort((a,b)=> order.indexOf(a.market) - order.indexOf(b.market));
+    $("#trOut").value = items.map(x=>x.query).join("\n");
+    const per = {};
+    for(const x of items) per[x.market] = (per[x.market]||0)+1;
+    $("#trState").innerHTML = `共 <b>${items.length}</b> 条 · `
+      + Object.entries(per).map(([m,n])=>`${m} ${n}`).join(" / ")
+      + ` · ${r.usedLLM ? "大模型生成" : "内置词典"}`;
+    if(r.warning) toast(r.warning);
+  }catch(e){ toast("翻译请求失败：" + String(e.message||e).slice(0,80)); }
+  finally{ btn.disabled = false; }
+};
+
+$("#b-tapply").onclick = async ()=>{
+  const lines = $("#trOut").value.split("\n").map(s=>s.trim()).filter(Boolean);
+  if(!lines.length){ toast("先点「翻译成本地语」拿到结果"); return; }
+  const existing = $("#qCustom").value.split("\n").map(s=>s.trim()).filter(Boolean);
+  const merged = [...new Set([...existing, ...lines])];
+  $("#qCustom").value = merged.join("\n");
+  await saveQueries(false);
+  toast(`已写入并保存 · 自定义检索式共 ${merged.length} 条`);
+};
+
 async function saveQueries(reset){
   const body = { reset: !!reset };
   if(!reset){
@@ -462,9 +621,11 @@ document.querySelectorAll("[data-copy]").forEach(b=>b.onclick=async ()=>{
 });
 
 (async ()=>{
+  renderTrMarkets();
   await loadStatus();
   await loadEnv();
   await loadQueries();
+  loadSocialStatus();
   attachJob();
   // EXE 首次启动带 #setup：缺 key 就直接滚到配置区，别让用户自己找
   const missing = LAST && (!LAST.keys.search || !LAST.keys.llm);

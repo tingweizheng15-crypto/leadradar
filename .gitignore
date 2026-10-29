@@ -15,6 +15,9 @@ Thumbs.db
 config.json
 config.local.json
 
+# 本地运行状态：见过域名记录、浏览器登录态（含 cookie，绝不能入库）
+data/
+
 # 本地工作记忆，不对外发布
 .workbuddy/
 

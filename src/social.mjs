@@ -1,5 +1,6 @@
 import { fetchHtml, enrichSite, detectSignals } from "./enrich.mjs";
 import { resolveProxy } from "./net.mjs";
+import { fetchProfile } from "./socialfetch.mjs";
 
 // 这些是平台的功能路径，不是用户名。
 // Google 搜 site:instagram.com 时绝大多数结果都是 /p/ 和 /reel/ 帖子页，
@@ -69,29 +70,57 @@ export async function enrichSocial(cfg, url) {
   const acc = { emails: [], phones: [], social: [], signals: [], title: "", text: "" };
   if (!platform || !handle) return acc;
 
-  if (platform === "instagram") {
-    const prof = await fetchInstagramProfile(handle, resolveProxy(cfg));
-    if (prof) {
+  // 新抓取器：复用 Chrome 登录态，能拿到粉丝/帖子/简介/外链
+  let prof = null;
+  try {
+    prof = await fetchProfile(platform, handle, { budget: 14000 });
+  } catch { /* 抓不到就走下面的老路 */ }
+
+  if (prof && prof.ok) {
+    acc.title = prof.name ? `${prof.name} (${platform})` : `${handle} (${platform})`;
+    acc.social.push({ platform, handle, url: prof.url });
+    acc.text = prof.bio || "";
+    if (prof.bio) acc.signals.push(...detectSignals(prof.bio));
+    if (prof.email) acc.emails.push({ value: prof.email, source: `${platform}-bio`, confidence: "official" });
+    if (prof.followers) acc.followers = prof.followers;
+    if (prof.posts) acc.posts = prof.posts;
+    if (prof.likes) acc.likes = prof.likes;
+    if (prof.website) {
+      try {
+        const site = await enrichSite(cfg, prof.website);
+        acc.emails.push(...site.emails);
+        acc.phones.push(...site.phones);
+        acc.social.push(...site.social);
+        acc.signals.push(...site.signals);
+        if (site.title && !prof.name) acc.title = site.title;
+        acc.website = prof.website;
+      } catch { /* 官网抓取失败不阻塞 */ }
+    }
+  } else if (platform === "instagram") {
+    // 老方案兜底：embed 页面在部分账号上仍然可用，不需要登录
+    const old = await fetchInstagramProfile(handle, resolveProxy(cfg));
+    if (old) {
       acc.title = `${handle} (Instagram)`;
       acc.social.push({ platform: "instagram", handle, url: `https://www.instagram.com/${handle}/` });
-      acc.text = prof.bio || "";
-      if (prof.bio) acc.signals.push(...detectSignals(prof.bio));
-      if (prof.email) acc.emails.push({ value: prof.email, source: "instagram-bio", confidence: "official" });
-      if (prof.website && prof.website !== `https://www.instagram.com/${handle}/`) {
+      acc.text = old.bio || "";
+      if (old.bio) acc.signals.push(...detectSignals(old.bio));
+      if (old.email) acc.emails.push({ value: old.email, source: "instagram-bio", confidence: "official" });
+      if (old.followers) acc.followers = old.followers;
+      if (old.posts) acc.posts = old.posts;
+      if (old.website && old.website !== `https://www.instagram.com/${handle}/`) {
         try {
-          const site = await enrichSite(cfg, prof.website);
+          const site = await enrichSite(cfg, old.website);
           acc.emails.push(...site.emails);
           acc.phones.push(...site.phones);
           acc.social.push(...site.social);
           acc.signals.push(...site.signals);
           if (site.title) acc.title = site.title;
-          acc.website = prof.website;
-          acc.followers = prof.followers;
-          acc.posts = prof.posts;
+          acc.website = old.website;
         } catch { /* 官网抓取失败不阻塞 */ }
       }
     }
   } else {
+    // TikTok / Facebook 的兜底：直接抓页面正文
     const html = await fetchHtml(url, { timeout: 8000, maxBytes: 800000, useChrome: false, proxy: resolveProxy(cfg) });
     acc.title = `${handle} (${platform})`;
     acc.social.push({ platform, handle, url });

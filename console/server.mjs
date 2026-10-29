@@ -17,6 +17,9 @@ import { jobCommand, IS_SEA } from "../src/runner.mjs";
 import { buildQueries, allocateQueries, effectiveTerms, DEFAULTS } from "../src/query.mjs";
 import { buildSocialQueries } from "../src/social.mjs";
 import { seenStats } from "../src/store.mjs";
+import { PLATFORMS, profileState, launchLogin, checkLogin, loginStatus } from "../src/browser.mjs";
+import { fetchProfile } from "../src/socialfetch.mjs";
+import { translateKeywords } from "../src/translate.mjs";
 
 /** 操作台预览要用和流水线完全一致的预算分配，否则显示的条数是假的 */
 function queryPlan(cfg) {
@@ -299,6 +302,63 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === "/api/status") return send(res, 200, "application/json", JSON.stringify(statusPayload()));
     if (url.pathname === "/api/reports") return send(res, 200, "application/json", JSON.stringify(listReports()));
     if (url.pathname === "/api/env" && req.method === "GET") return send(res, 200, "application/json", JSON.stringify(maskEnv()));
+
+    // ---------- 社媒登录态 ----------
+    if (url.pathname === "/api/social/status" && req.method === "GET") {
+      const login = await loginStatus();
+      return send(res, 200, "application/json", JSON.stringify({
+        profile: profileState(),
+        login,
+        platforms: Object.entries(PLATFORMS).map(([k, v]) => ({ key: k, name: v.name, url: v.url, loggedIn: login ? !!login[k] : null })),
+      }));
+    }
+
+    if (url.pathname === "/api/social/login" && req.method === "POST") {
+      try {
+        const body = JSON.parse((await readBody(req)) || "{}");
+        const r = launchLogin(body.platform || "instagram");
+        return send(res, 200, "application/json", JSON.stringify(r));
+      } catch (e) {
+        return send(res, 200, "application/json", JSON.stringify({ ok: false, error: String(e.message || e).slice(0, 200) }));
+      }
+    }
+
+    if (url.pathname === "/api/social/check" && req.method === "POST") {
+      try {
+        const body = JSON.parse((await readBody(req)) || "{}");
+        const list = body.platforms || Object.keys(PLATFORMS);
+        const out = [];
+        for (const p of list) out.push(await checkLogin(p));
+        return send(res, 200, "application/json", JSON.stringify({ ok: true, results: out, profile: profileState() }));
+      } catch (e) {
+        return send(res, 200, "application/json", JSON.stringify({ ok: false, error: String(e.message || e).slice(0, 200) }));
+      }
+    }
+
+    if (url.pathname === "/api/social/fetch" && req.method === "POST") {
+      try {
+        const body = JSON.parse((await readBody(req)) || "{}");
+        const platform = String(body.platform || "").toLowerCase();
+        const handle = String(body.handle || "").replace(/^@/, "").trim();
+        if (!platform || !handle) return send(res, 200, "application/json", JSON.stringify({ ok: false, error: "需要 platform 和 handle" }));
+        const r = await fetchProfile(platform, handle);
+        return send(res, 200, "application/json", JSON.stringify(r));
+      } catch (e) {
+        return send(res, 200, "application/json", JSON.stringify({ ok: false, error: String(e.message || e).slice(0, 200) }));
+      }
+    }
+
+    // 中文关键词 → 目标国家本地语检索词
+    if (url.pathname === "/api/queries/translate" && req.method === "POST") {
+      try {
+        const body = JSON.parse((await readBody(req)) || "{}");
+        const cfg = loadConfig();
+        const r = await translateKeywords(cfg, body.chinese || "", body.markets || cfg.markets);
+        return send(res, 200, "application/json", JSON.stringify({ ok: true, ...r }));
+      } catch (e) {
+        return send(res, 200, "application/json", JSON.stringify({ ok: false, error: String(e.message || e).slice(0, 300) }));
+      }
+    }
 
     if (url.pathname === "/api/queries" && req.method === "GET") {
       const cfg = loadConfig();

@@ -200,6 +200,25 @@ npm run build:exe -- --no-desktop   # 只留在 dist/
 
 保存后写进 `config.json` 的 `search.*`，下一轮生效；卡片底部实时显示「当前生效 N 条 / 生成了 M 条，截断 X 条」和前 8 条预览。「恢复默认」一键清空所有覆盖。
 
+#### 中文关键词 → 本地语（`src/translate.mjs`）
+
+写中文就行，不用自己想外语词。卡片顶部「中文关键词 → 本地语」区块：一行一条，勾目标市场，点「翻译成本地语」。
+
+关键是**不直译**：要的是当地人真会在 Coupang / Shopee / Tokopedia / Google 里敲的词。
+
+| 中文 | 韩国 | 泰国 | 印尼 | 马来 | 英美 |
+|---|---|---|---|---|---|
+| 压缩裤 | 압축 레깅스（不是 압축 타이즈） | กางเกงรัดกล้ามเนื้อ（不是 บีบกล้ามเนื้อ） | celana compression（不用 kompresi） | seluar compression | compression tights |
+| 批发 | 도매 | ขายส่ง | grosir | borong | wholesale |
+| 代工 | OEM 제작 | รับผลิต | konveksi | pengilang | private label manufacturer |
+
+- 有大模型 key → 让模型按本地电商搜索习惯生成，每个国家给 2 条（一条批发、一条代工），能跟上新词
+- 没 key 或调不通 → 内置词典兜底，跑步服饰常用词离线可用
+- 英语国家自动补地理标记（`... wholesale USA` / `... wholesale UK`），否则美国词和英国词一模一样，会被认成同一个国家、白花一次额度
+- 结果落在可编辑文本框里，改完点「写入自定义检索式并保存」，存的是**成品词**——之后每轮直接跑，不再调模型（省钱、可复现）
+
+实测：`러닝 압축 레깅스 도매`（gl=kr）搜出 `sansansports.com`、`freeship.co.kr`；`กางเกงวิ่งรัดกล้ามเนื้อ ขายส่ง`（gl=th）搜出 `shopee.co.th`、`cw-x.co.th`、`luckrunningshop.com`、`rev.co.th`。
+
 > 打包成 EXE 后，`config.json` 不会被当作内置资源覆盖——升级程序不会冲掉你调好的词表和 key。
 
 ---

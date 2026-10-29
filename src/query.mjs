@@ -99,16 +99,53 @@ export function buildQueries(cfg, { full = false } = {}) {
   // 自定义检索式：原样保留，尽力回填产品/国家，好让评分维度照常生效
   const TLD_MAP = [["co.kr", "KR"], ["co.th", "TH"], ["co.id", "ID"], ["com.my", "MY"], ["co.uk", "UK"], [".kr", "KR"], [".th", "TH"], [".id", "ID"], [".my", "MY"], [".uk", "UK"]];
 
+  // 本地语检索词里通常没有 "Korea/Thailand" 这种英文国家名，
+  // 认不出来就会退回默认的 gl=us，等于拿美国视角搜韩语词——必须按文字特征判断
+  function countryByScript(text) {
+    const t = String(text || "");
+    if (/[\uAC00-\uD7AF\u1100-\u11FF]/.test(t)) return "KR"; // 韩文
+    if (/[\u0E00-\u0E7F]/.test(t)) return "TH";              // 泰文
+    if (/\b(grosir|celana|rompi|konveksi|kaos|sepatu|olahraga)\b/i.test(t)) return "ID";
+    if (/\b(borong|seluar|pembekal|baju|sukan|kasut)\b/i.test(t)) return "MY";
+    // 英语词靠地理标记区分：UK 必须先判，否则 "uk" 会被 US 的 \bus\b 吃掉
+    if (/\b(uk|u\.k|united kingdom|britain|england|london)\b/i.test(t)) return "UK";
+    if (/\b(usa|u\.s\.a|united states|america)\b/i.test(t)) return "US";
+    return "";
+  }
+
+  // 本地语里的产品词和英文完全不同，不映射的话评分里的「产品匹配」维度会一直是 0
+  function productByScript(text) {
+    const t = String(text || "");
+    // 瑜伽裤不属于「压缩裤」：只认 yoga 而没提压缩/压迫的，别硬算成产品匹配（会虚高评分）
+    if (/요가|yoga|โยคะ/i.test(t) && !/압축|압박|compression|รัดกล้ามเนื้อ|คอมเพรส/i.test(t)) return "";
+    if (/압축|타이즈|레깅스|กางเกงรัด|รัดกล้ามเนื้อ|กางเกงคอมเพรส|compression|ketat|tight/i.test(t)) return "compression_tights";
+    if (/싱글렛|เสื้อกล้าม|rompi|singlet|마라톤|มาราธอน|marathon/i.test(t)) return "running_singlet";
+    if (/티셔츠|속건|เสื้อแห้งเร็ว|kaos|baju|quick.?dry|티\b/i.test(t)) return "quick_dry";
+    if (/반바지|กางเกงวิ่ง|celana lari|seluar lari|shorts/i.test(t)) return "running_shorts";
+    return "";
+  }
+
   const customRaw = (Array.isArray(s.custom_queries) ? s.custom_queries : []).map(clean).filter(Boolean);
   const customList = customRaw.map((text) => {
     const low = text.toLowerCase();
-    const p = products.find((x) => low.includes(String(productTerms[x] || x).toLowerCase())) || "";
-    let c = markets.find((x) => low.includes(String(countryTerms[x] || x).toLowerCase())) || "";
+    const p = products.find((x) => low.includes(String(productTerms[x] || x).toLowerCase())) || productByScript(text) || "";
+    // 短国家码（US/UK/ID/MY）必须按整词匹配，否则 "sukan" 里的 "uk" 会把马来语词判成英国
+    let c = markets.find((x) => {
+      const term = String(countryTerms[x] || x);
+      if (term.length <= 3 && /^[A-Za-z]+$/.test(term)) {
+        return new RegExp(`(^|[^A-Za-z])${term}([^A-Za-z]|$)`, "i").test(text);
+      }
+      return low.includes(term.toLowerCase());
+    }) || "";
     if (!c) {
       // site:.co.kr 这类后缀也能定国家
       for (const [suffix, code] of TLD_MAP) {
         if (low.includes(suffix) && markets.includes(code)) { c = code; break; }
       }
+    }
+    if (!c) {
+      const byScript = countryByScript(text);
+      if (byScript && (!markets.length || markets.includes(byScript))) c = byScript;
     }
     return { q: text, product: p, country: c, type: "brand", custom: true };
   });
