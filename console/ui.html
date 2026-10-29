@@ -93,6 +93,12 @@
   .detect{font-size:11.5px;line-height:1.8;padding:9px 12px;border-radius:9px;background:#f8fafc;border:1px solid #e8eef6;color:var(--ink2);margin-left:160px}
   .detect.ok{background:#f0fdf4;border-color:#bbf7d0;color:#15803d}
   .detect.warn{background:#fffbeb;border-color:#fde68a;color:#b45309}
+  .gbox{margin-top:10px;border:1px solid #dbeafe;background:#f8fbff;border-radius:11px;padding:12px 14px}
+  .gtitle{font-size:12px;font-weight:700;color:#1e40af}
+  .gsub{font-size:11.5px;color:var(--ink2);margin-top:5px;line-height:1.85}
+  .gsteps{font-size:11.5px;line-height:1.95;margin:10px 0 12px;padding-left:18px;color:var(--ink2)}
+  .gsteps a{color:var(--red-d);text-decoration:none;border-bottom:1px dashed #fda4af}
+  .gfoot{margin-top:9px;font-size:11px;color:var(--ink3);line-height:1.8}
   .guide{background:#f8fafc;border:1px solid #e8eef6;border-radius:10px;padding:12px 14px;margin-top:10px;font-size:12px;line-height:1.9;color:var(--ink2)}
   .guide h4{margin:0 0 4px;font-size:12px;color:var(--ink)}
   .guide ol{margin:6px 0 0;padding-left:20px}
@@ -172,6 +178,12 @@
       <div class="row"><label>输出上限 tokens</label><input id="LLM_MAX_TOKENS" data-key="LLM_MAX_TOKENS" placeholder="默认 4000；思考型模型建议 8000" inputmode="numeric"></div>
       <div class="kvsub">思考型模型（deepseek-reasoner / flash / o1）的思考过程也吃这个额度，太小会让开发信为空。留空用默认 4000。</div>
       <div class="row"><label>代理 HTTPS_PROXY</label><input id="HTTPS_PROXY" data-key="HTTPS_PROXY" placeholder="http://127.0.0.1:7890"></div>
+      <div class="row"><label></label>
+        <div class="btns" style="margin:0;align-items:center">
+          <button class="ghost" id="b-pdetect">自动检测本机代理</button>
+          <span class="kvsub" id="pDetectState" style="margin:0"></span>
+        </div>
+      </div>
       <div class="kvsub" id="proxyNow">当前生效：—</div>
 
       <details style="margin-top:6px">
@@ -212,13 +224,37 @@
       <div class="mhead">② 你的发信邮箱 · SMTP 登录 <span class="mtag" id="mBadge">未登录</span></div>
       <div class="kvsub" style="margin:0 0 10px;font-size:11.5px">
         用你已有的邮箱就行（QQ / 163 / Gmail / 公司邮箱都行），<b>不需要自己搭邮件服务器</b>。
-        服务器、端口、加密这些工具会自动填好，你只要填 <b>邮箱</b> 和 <b>授权码</b>。
+        服务器、端口、加密这些工具会自动填好；一般只要填 <b>邮箱</b> 和 <b>授权码</b>，Gmail 可以跳过授权码，直接用下面的 Google 授权。
       </div>
 
       <div class="row"><label>邮箱地址</label><input id="mUser" placeholder="例如 123456@qq.com" autocomplete="username" spellcheck="false"></div>
       <div class="row"><label>授权码 / 密码</label><input id="mPass" type="password" placeholder="QQ / 163 要「授权码」，Gmail 要「应用专用密码」" autocomplete="current-password"></div>
 
       <div class="detect" id="mDetect">填完邮箱，这里会显示是哪家邮箱、用哪个服务器</div>
+
+      <div class="gbox" id="mGoogle" hidden>
+        <div class="gtitle">Gmail 专用：用 Google 账号授权，不需要应用密码</div>
+        <div class="gsub" id="gState">未授权</div>
+        <div class="btns" style="margin-top:8px">
+          <button class="primary" id="b-gAuth">用 Google 账号授权</button>
+          <button class="ghost" id="b-gSetup">第一次用？看怎么建</button>
+          <button class="ghost" id="b-gRevoke" style="display:none">撤销授权</button>
+        </div>
+        <div id="gSetupBox" hidden>
+          <ol class="gsteps">
+            <li>打开 <a href="https://console.cloud.google.com/projectcreate" target="_blank" rel="noopener">新建项目</a>，名字随便填（如 leadradar）；创建后确认左上角选中的是这个项目</li>
+            <li>打开 <a href="https://console.cloud.google.com/apis/library/gmail.googleapis.com" target="_blank" rel="noopener">Gmail API</a>，点「启用」</li>
+            <li>打开 <a href="https://console.cloud.google.com/apis/credentials/consent" target="_blank" rel="noopener">OAuth 同意屏幕</a>：选「外部」→ 填应用名和你自己的邮箱 → 保存；在「测试用户」里把要用的 Gmail 加进去</li>
+            <li>打开 <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener">凭据</a> → 创建凭据 → OAuth 客户端 ID → 类型必须选 <b>桌面应用</b> → 创建</li>
+            <li>把弹窗里的 <b>客户端 ID</b> 和 <b>客户端密钥</b> 粘到下面，点保存</li>
+            <li>回来点「用 Google 账号授权」，在浏览器里登录并点「继续 / 允许」</li>
+          </ol>
+          <div class="row"><label>Client ID</label><input id="gClientId" spellcheck="false" placeholder="xxxxx.apps.googleusercontent.com" autocomplete="off"></div>
+          <div class="row"><label>Client Secret</label><input id="gClientSecret" type="password" spellcheck="false" placeholder="GOCSPX-…" autocomplete="off"></div>
+          <div class="btns" style="margin-top:6px"><button class="primary" id="b-gSave">保存 Client 配置</button></div>
+          <div class="gfoot">同意屏幕停在「测试」状态时，Google 的授权 7 天会过期——到时点一次「重新授权」就行。想长期有效，可在同意屏幕点「发布应用」（会提示未验证，自己用可以继续）。</div>
+        </div>
+      </div>
 
       <div class="btns" style="margin-top:10px">
         <button class="primary" id="b-mLogin">登录测试</button>
@@ -756,6 +792,7 @@ function updateDetect(fill){
   const d = mailDomain(email);
   const el = $("#mDetect");
   if(!el) return;
+  renderGoogleBox();
   if(!d){
     el.className = "detect";
     el.textContent = "填完邮箱，这里会显示是哪家邮箱、用哪个服务器";
@@ -861,6 +898,81 @@ $("#b-mfGrab").onclick = async ()=>{
   finally{ btn.disabled = false; }
 };
 
+/** Gmail 专用：没有应用密码时用 OAuth 走 XOAUTH2 */
+function renderGoogleBox(){
+  const box = $("#mGoogle");
+  if(!box) return;
+  const email = $("#mUser").value.trim();
+  const isGmail = /@(gmail|googlemail)\.com$/i.test(email);
+  box.hidden = !isGmail;
+  if(!isGmail) return;
+  const g = (MAIL.state && MAIL.state.google) || {};
+  const sm = (MAIL.state && MAIL.state.smtp) || {};
+  const oauth = sm.oauth || {};
+  const authorized = !!(g.authorized || oauth.authorized);
+  const configured = !!(g.configured || oauth.configured);
+  const acct = g.email || oauth.email || "";
+  $("#gState").innerHTML = authorized
+    ? `<span style="color:var(--ok)">✓ 已授权${acct ? ` <b>${esc(acct)}</b>` : ""}</span> —— 点「登录测试」会自动用令牌，密码框留空即可`
+    : configured
+      ? "Client 已配置。点「用 Google 账号授权」，在浏览器里登录并允许一次（约 30 秒）"
+      : "还没配置 Google 项目。点「第一次用？看怎么建」，跟着 6 步做一次，以后不用再弄";
+  $("#b-gRevoke").style.display = authorized ? "" : "none";
+  $("#b-gAuth").textContent = authorized ? "重新授权" : "用 Google 账号授权";
+  const cid = $("#gClientId");
+  if(cid && !cid.value && g.clientId) cid.placeholder = String(g.clientId).slice(0, 20) + "…（已保存，留空不修改）";
+  const sec = $("#gClientSecret");
+  if(sec && g.hasSecret) sec.placeholder = "已保存，留空不修改";
+}
+
+$("#b-gSetup").onclick = ()=>{
+  const b = $("#gSetupBox");
+  b.hidden = !b.hidden;
+};
+
+$("#b-gSave").onclick = async ()=>{
+  const body = { clientId: $("#gClientId").value.trim(), clientSecret: $("#gClientSecret").value.trim() };
+  if(!body.clientId){ toast("先粘 Client ID"); $("#gClientId").focus(); return; }
+  const r = await api("/api/mail/google/config", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body) });
+  if(!r.ok){ toast("保存失败"); return; }
+  toast(r.configured ? "Client 配置已保存" : "已保存，但还缺 Client Secret");
+  $("#gClientSecret").value = "";
+  await loadMail();
+};
+
+let gPoll = null;
+
+$("#b-gAuth").onclick = async ()=>{
+  const r = await api("/api/mail/google/start", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ email: $("#mUser").value.trim() }) });
+  if(!r.ok){
+    toast(r.error || "打不开授权页");
+    $("#gSetupBox").hidden = false;
+    return;
+  }
+  window.open(r.authUrl, "_blank");
+  $("#gState").innerHTML = '<span style="color:var(--ink3)">等待你在浏览器里授权…完成后这里会自动更新（最多 3 分钟）</span>';
+  clearInterval(gPoll);
+  const t0 = Date.now();
+  gPoll = setInterval(async ()=>{
+    if(Date.now() - t0 > 180000){ clearInterval(gPoll); return; }
+    try{
+      const s = await api("/api/mail/google/status");
+      if(s.authorized){
+        clearInterval(gPoll);
+        await loadMail();
+        toast("Gmail 授权成功，点「登录测试」验证");
+      }
+    }catch{ /* 轮询失败继续等 */ }
+  }, 2000);
+};
+
+$("#b-gRevoke").onclick = async ()=>{
+  if(!confirm("撤销本地保存的 Gmail 授权？\n撤销后要重新点一次授权才能发信（Google 侧的授权记录在 myaccount.google.com/permissions 里删）。")) return;
+  await api("/api/mail/google/revoke", { method:"POST" });
+  toast("已撤销本地授权");
+  await loadMail();
+};
+
 // 按域名自动填服务器：qq/163/gmail 这些常见邮箱直接给对，省得用户查
 $("#mUser").addEventListener("blur", ()=>updateDetect(true));
 $("#mUser").addEventListener("input", ()=>{
@@ -905,13 +1017,24 @@ $("#b-mGuess").onclick = async ()=>{
 $("#b-mLogin").onclick = async ()=>{
   const body = smtpForm();
   if(!body.user){ toast("先填邮箱地址"); $("#mUser").focus(); return; }
-  if(!body.pass && !(MAIL.state && MAIL.state.smtp && MAIL.state.smtp.passSet)){ toast("填一下授权码 / 密码"); $("#mPass").focus(); return; }
+  const g = (MAIL.state && MAIL.state.google) || {};
+  const oauthOk = g.authorized && /@(gmail|googlemail)\.com$/i.test(body.user);
+  const passSaved = !!(MAIL.state && MAIL.state.smtp && MAIL.state.smtp.passSet);
+  if(!body.pass && !oauthOk && !passSaved){
+    toast("填一下授权码 / 密码；Gmail 也可以先点「用 Google 账号授权」");
+    $("#mPass").focus();
+    return;
+  }
   const btn = $("#b-mLogin"); btn.disabled = true;
   $("#mState").innerHTML = '<span style="color:var(--ink3)">连接 SMTP 并认证中…（约 2-6 秒）</span>';
   try{
     const r = await api("/api/mail/smtp/login", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body) });
     mailSteps("#mState", r, "登录成功，已写入 .env");
     if(r.ok){ toast("登录成功"); await loadMail(); loadStatus(); }
+    else if(r.code === "NEED_REAUTH"){
+      renderGoogleBox();
+      toast("Gmail 授权过期了，点一次「重新授权」");
+    }
     else if(/535|授权码|认证|密码|login/i.test(r.error||"")) {
       // 认证失败九成是「用了网页密码」而不是授权码：直接把步骤摊开给他看
       showGuide(guideKeyOf(body.user));
@@ -1080,6 +1203,25 @@ $("#b-live").onclick = ()=>run("doctorLive","联网实测");
 $("#b-next").onclick = ()=>run("next","下次运行时间");
 $("#b-stop").onclick = async ()=>{ await api("/api/stop",{method:"POST"}); toast("已请求停止"); };
 $("#b-reload").onclick = ()=>{ loadEnv(); loadStatus(); toast("已刷新"); };
+
+// 代理端口经常变（7897 / 7890 / 10809…），让服务端挨个试，能访问 Google 的那个才算数
+$("#b-pdetect").onclick = async ()=>{
+  const btn = $("#b-pdetect"); btn.disabled = true;
+  $("#pDetectState").textContent = "检测中…（约 3-8 秒）";
+  try{
+    const r = await api("/api/proxy/detect", { method:"POST" });
+    if(r.suggested){
+      $("#HTTPS_PROXY").value = r.suggested;
+      await api("/api/env", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ HTTPS_PROXY: r.suggested }) });
+      $("#pDetectState").innerHTML = `<span style="color:var(--ok)">✓ 已设置 ${esc(r.suggested)}</span>`;
+      toast("代理已设置：" + r.suggested);
+      loadStatus();
+    } else {
+      $("#pDetectState").innerHTML = `<span style="color:var(--bad)">✕ ${esc(r.note||"没找到可用代理")}</span>`;
+    }
+  }catch(e){ $("#pDetectState").innerHTML = `<span style="color:var(--bad)">✕ ${esc(String(e.message||e))}</span>`; }
+  finally{ btn.disabled = false; }
+};
 $("#b-save").onclick = async ()=>{
   const body = {};
   document.querySelectorAll("[data-key]").forEach(el=> body[el.dataset.key] = el.value.trim());

@@ -5,11 +5,13 @@
  * 只监听 127.0.0.1，不对外暴露；所有命令都在项目目录内执行。
  */
 import http from "node:http";
+import net from "node:net";
 import fs from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { loadConfig, loadEnvFile, ROOT, searchReady, llmReady, emailFinderReady } from "../src/config.mjs";
+import { proxiedFetch } from "../src/net.mjs";
 import { providerName, search } from "../src/search.mjs";
 import { findChrome } from "../src/enrich.mjs";
 import { jobsOf, parseHms, nextRunEpoch, fmt } from "../src/schedule.mjs";
@@ -26,6 +28,7 @@ import {
   MAIL_PRESETS, MAIL_GUIDES, FINDER_PROVIDERS, finderProvider, mailPreset, guideFor,
   smtpConfig, smtpLogin, verifyAddresses, sendMail, testFinder, guessSmtpHost,
 } from "../src/mailer.mjs";
+import { googleCreds, googleStatus, buildAuthUrl, completeAuth, withGmailAuth } from "../src/googleoauth.mjs";
 
 /** 操作台预览要用和流水线完全一致的预算分配，否则显示的条数是假的 */
 function queryPlan(cfg) {
@@ -55,12 +58,14 @@ const ENV_KEYS = [
   "LLM_API_KEY", "LLM_BASE_URL", "LLM_MODEL", "LLM_MAX_TOKENS",
   "HUNTER_API_KEY", "APOLLO_API_KEY", "SNOV_USER_ID", "SNOV_SECRET", "EMAIL_FINDER_PROVIDER",
   "SMTP_USER", "SMTP_PASS", "SMTP_HOST", "SMTP_PORT", "SMTP_SECURE", "SMTP_FROM", "SMTP_NAME",
+  "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REFRESH_TOKEN", "GOOGLE_ACCOUNT_EMAIL",
   "CHROME_PATH", "HTTPS_PROXY",
 ];
 // 这些不是秘密，页面要回显真实值（否则用户不知道自己当前用的是哪个 provider / 模型）
 const PLAIN_KEYS = new Set([
   "SEARCH_PROVIDER", "LLM_BASE_URL", "LLM_MODEL", "HTTPS_PROXY", "CHROME_PATH",
   "EMAIL_FINDER_PROVIDER", "SMTP_USER", "SMTP_HOST", "SMTP_PORT", "SMTP_SECURE", "SMTP_FROM", "SMTP_NAME",
+  "GOOGLE_CLIENT_ID", "GOOGLE_ACCOUNT_EMAIL",
 ]);
 const MASK = "••••••";
 
@@ -164,9 +169,9 @@ function countSources() {
 
 function statusPayload() {
   const cfg = loadConfig();
-  const env = loadEnvFile();
+  const env = mailEnv();
   const proxy = cfg.proxy || process.env.HTTPS_PROXY || process.env.HTTP_PROXY || "";
-  const sm = smtpConfig({ ...process.env, ...env });
+  const sm = smtpConfig(env);
   const jobsList = jobsOf(cfg).map((j) => {
     const next = nextRunEpoch(parseHms(j.time), j.tz);
     return { key: j.key, name: j.name, time: j.time, enabled: j.enabled, tz: j.tz, nextText: fmt(next, j.tz), nextInMs: next - Date.now() };
@@ -185,6 +190,7 @@ function statusPayload() {
       finderReady: emailFinderReady(cfg),
       smtpReady: sm.ready,
       smtpUser: sm.user,
+      google: googleStatus(env),
     },
     chrome: findChrome() || "",
     proxy,
@@ -236,6 +242,43 @@ function saveEnv(updates) {
   return applied;
 }
 
+function removeEnvKeys(keys) {
+  const p = path.join(ROOT, ".env");
+  if (!fs.existsSync(p)) return [];
+  const before = fs.readFileSync(p, "utf8").split(/\r?\n/);
+  const after = before.filter((l) => !keys.some((k) => l.trim().startsWith(k + "=")));
+  if (after.length !== before.length) {
+    fs.writeFileSync(p, after.join("\n").replace(/\n+$/, "") + "\n", "utf8");
+  }
+  return keys.filter((k) => before.some((l) => l.trim().startsWith(k + "=")));
+}
+
+const escHtml = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
+
+/* ---------------- 代理自检 ---------------- */
+
+// 常见本地代理端口：Clash(7897/7890)、V2Ray(10809/10808)、SS(1080)、其他(8889/8080…)
+const PROXY_PORTS = [7897, 7890, 10809, 10808, 1080, 8889, 8080, 4780, 6152, 20171, 8888];
+
+function tcpAlive(port, host = "127.0.0.1", ms = 450) {
+  return new Promise((resolve) => {
+    const s = net.connect({ host, port });
+    let done = false;
+    const fin = (ok) => { if (done) return; done = true; try { s.destroy(); } catch { /* ignore */ } resolve(ok); };
+    s.once("connect", () => fin(true));
+    s.once("error", () => fin(false));
+    s.setTimeout(ms, () => fin(false));
+  });
+}
+
+async function proxyWorks(port) {
+  try {
+    // __noDirect：检测时必须真的走这个端口，不能靠「直连能通」蒙混过关
+    const r = await proxiedFetch({ proxy: `http://127.0.0.1:${port}` }, "https://www.google.com/generate_204", { __noDirect: true }, 6000);
+    return r.status >= 200 && r.status < 400;
+  } catch { return false; }
+}
+
 const ALLOWED_EXT = new Set([".html", ".md", ".csv", ".json", ".png", ".txt", ".log"]);
 
 /* ---------------- 邮箱配置 ---------------- */
@@ -268,6 +311,9 @@ function finderCreds(cfg) {
 function smtpPayload(env) {
   const sm = smtpConfig(env);
   const preset = sm.user ? mailPreset(sm.user) : null;
+  const g = googleStatus(env);
+  const isGmail = /@(gmail|googlemail)\.com$/i.test(sm.user || "");
+  const oauthReady = isGmail && g.authorized;
   return {
     user: sm.user,
     host: sm.host,
@@ -276,7 +322,9 @@ function smtpPayload(env) {
     from: sm.from,
     name: sm.name,
     passSet: !!sm.pass,
-    ready: sm.ready,
+    // 有 OAuth 时不需要密码也算就绪
+    ready: !!sm.user && !!sm.host && (!!sm.pass || oauthReady),
+    oauth: { isGmail, ready: oauthReady, configured: g.configured, authorized: g.authorized, email: g.email },
     preset: preset ? { domain: preset.domain, hint: preset.hint, web: preset.web, guessed: !!preset.guessed, guide: preset.guide || "other" } : null,
   };
 }
@@ -302,7 +350,26 @@ function mailStatePayload() {
     lastLogin: lastSmtpLogin,
     presets: MAIL_PRESETS,
     guides: MAIL_GUIDES,
+    google: {
+      ...googleStatus(env),
+      clientId: env.GOOGLE_CLIENT_ID || "",
+      hasSecret: !!env.GOOGLE_CLIENT_SECRET,
+    },
   };
+}
+
+/** 已保存的发信配置（含 Gmail OAuth 令牌），发信/验证都用它 */
+async function smtpForSend() {
+  const env = mailEnv();
+  const base = smtpConfig(env);
+  const g = googleStatus(env);
+  const gmail = /@(gmail|googlemail)\.com$/i.test(base.user || "");
+  if (!base.user || !base.host || (!base.pass && !(gmail && g.authorized))) {
+    const err = new Error("还没登录邮箱：填邮箱 + 授权码（Gmail 可以直接点「用 Google 账号授权」），先点「登录测试」");
+    err.code = "NOT_READY";
+    throw err;
+  }
+  return await withGmailAuth(loadConfig(), base, env);
 }
 
 /** 把「表单上的发信配置」解析成可用的 SMTP 参数：留空的字段回落到已保存的值 */
@@ -423,9 +490,95 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === "/api/reports") return send(res, 200, "application/json", JSON.stringify(listReports()));
     if (url.pathname === "/api/env" && req.method === "GET") return send(res, 200, "application/json", JSON.stringify(maskEnv()));
 
+    // 代理软件端口经常变，让工具自己找一遍：先看端口开着，再用它访问 Google 验证真能出去
+    if (url.pathname === "/api/proxy/detect" && req.method === "POST") {
+      const alive = (await Promise.all(PROXY_PORTS.map(async (p) => ((await tcpAlive(p)) ? p : 0)))).filter(Boolean);
+      const checked = await Promise.all(alive.map(async (p) => ({ port: p, ok: await proxyWorks(p) })));
+      const working = checked.filter((x) => x.ok).map((x) => x.port);
+      return send(res, 200, "application/json", JSON.stringify({
+        ok: true,
+        candidates: alive,
+        working,
+        suggested: working[0] ? `http://127.0.0.1:${working[0]}` : "",
+        note: working.length
+          ? "找到一个能访问 Google 的代理，已填好"
+          : (alive.length
+            ? "端口开着，但都出不去（代理软件没开规则 / 没连上节点）"
+            : "没发现本地代理端口。先打开你的代理软件（Clash / V2Ray 等），再点一次"),
+      }));
+    }
+
     // ---------- 邮箱：查找服务 + 发信邮箱 ----------
     if (url.pathname === "/api/mail/state" && req.method === "GET") {
       return send(res, 200, "application/json", JSON.stringify(mailStatePayload()));
+    }
+
+    // ---------- Gmail OAuth（不依赖应用密码） ----------
+    if (url.pathname === "/api/mail/google/status" && req.method === "GET") {
+      const env = mailEnv();
+      return send(res, 200, "application/json", JSON.stringify({
+        ok: true,
+        ...googleStatus(env),
+        clientId: env.GOOGLE_CLIENT_ID || "",
+        hasSecret: !!env.GOOGLE_CLIENT_SECRET,
+      }));
+    }
+
+    if (url.pathname === "/api/mail/google/config" && req.method === "POST") {
+      const body = JSON.parse((await readBody(req)) || "{}");
+      const updates = {};
+      const cid = cleanStr(body.clientId, 240);
+      const sec = String(body.clientSecret ?? "").trim();
+      if (cid) updates.GOOGLE_CLIENT_ID = cid;
+      if (sec && !sec.includes(MASK)) updates.GOOGLE_CLIENT_SECRET = sec;
+      const applied = saveEnv(updates);
+      return send(res, 200, "application/json", JSON.stringify({ ok: true, applied, ...googleStatus(mailEnv()) }));
+    }
+
+    if (url.pathname === "/api/mail/google/start" && req.method === "POST") {
+      try {
+        const body = JSON.parse((await readBody(req)) || "{}");
+        const c = googleCreds(mailEnv());
+        if (!c.clientId || !c.clientSecret) {
+          return send(res, 200, "application/json", JSON.stringify({ ok: false, error: "先把 Client ID 和 Client Secret 填上（点「看怎么建」有逐步引导）" }));
+        }
+        // 桌面应用的 loopback 回调，Google 不校验端口，直接用操作台自己的地址
+        const redirectUri = `http://127.0.0.1:${PORT}/oauth2/callback`;
+        const { url: authUrl } = buildAuthUrl(c, redirectUri, cleanStr(body.email, 120));
+        return send(res, 200, "application/json", JSON.stringify({ ok: true, authUrl, redirectUri }));
+      } catch (e) {
+        return send(res, 200, "application/json", JSON.stringify({ ok: false, error: String(e.message || e).slice(0, 200) }));
+      }
+    }
+
+    if (url.pathname === "/api/mail/google/revoke" && req.method === "POST") {
+      const removed = removeEnvKeys(["GOOGLE_REFRESH_TOKEN", "GOOGLE_ACCOUNT_EMAIL"]);
+      return send(res, 200, "application/json", JSON.stringify({ ok: true, removed, ...googleStatus(mailEnv()) }));
+    }
+
+    // Google 授权完成后浏览器跳回这里
+    if (url.pathname === "/oauth2/callback" && req.method === "GET") {
+      const err = url.searchParams.get("error") || "";
+      const code = url.searchParams.get("code") || "";
+      const state = url.searchParams.get("state") || "";
+      const page = (title, msg, ok) => `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>${escHtml(title)}</title>
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f5f6f8;font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;color:#0f172a}
+.c{background:#fff;border:1px solid #e6e9ef;border-radius:16px;padding:34px 38px;max-width:470px;box-shadow:0 8px 30px rgba(15,23,42,.06);text-align:center}
+.i{font-size:34px;line-height:1}.t{font-size:17px;font-weight:700;margin:12px 0 8px}.m{font-size:13px;color:#475569;line-height:1.8;word-break:break-word}
+.b{margin-top:18px;font-size:11.5px;color:#94a3b8;line-height:1.7}</style>
+<div class="c"><div class="i">${ok ? "✅" : "⚠️"}</div><div class="t">${escHtml(title)}</div><div class="m">${escHtml(msg)}</div>
+<div class="b">${ok ? "这个页面会自动关闭；没关就手动关掉，回操作台继续" : "回操作台重试；如果是 Client 配置问题，点「看怎么建」检查一遍"}</div></div>
+${ok ? "<script>setTimeout(()=>window.close(),1600)<\/script>" : ""}</html>`;
+      if (err) return send(res, 200, "text/html; charset=utf-8", page("授权被取消", `Google 返回：${err}`, false));
+      if (!code) return send(res, 200, "text/html; charset=utf-8", page("没拿到授权码", "地址里没有 code，可能被浏览器插件改写了", false));
+      try {
+        const cfg = loadConfig();
+        const r = await completeAuth(cfg, googleCreds(mailEnv()), { code, state });
+        saveEnv({ GOOGLE_REFRESH_TOKEN: r.refreshToken, GOOGLE_ACCOUNT_EMAIL: r.email });
+        return send(res, 200, "text/html; charset=utf-8", page("授权成功", `${r.email || "Gmail 账号"} 已连接，回操作台点「登录测试」`, true));
+      } catch (e) {
+        return send(res, 200, "text/html; charset=utf-8", page("授权失败", String(e.message || e), false));
+      }
     }
 
     if (url.pathname === "/api/mail/finder" && req.method === "POST") {
@@ -520,7 +673,8 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === "/api/mail/smtp/login" && req.method === "POST") {
       try {
         const body = JSON.parse((await readBody(req)) || "{}");
-        const sm = resolveSmtpInput(body, mailEnv());
+        const env = mailEnv();
+        const sm = await withGmailAuth(loadConfig(), resolveSmtpInput(body, env), env);
         const r = await smtpLogin(sm);
         if (!r.ok) {
           lastSmtpLogin = { ok: false, at: Date.now(), error: r.error, steps: r.steps || [] };
@@ -542,7 +696,9 @@ const server = http.createServer(async (req, res) => {
           ok: true, steps: r.steps, auth: r.auth, ms: r.ms, saved: applied, smtp: smtpPayload(mailEnv()),
         }));
       } catch (e) {
-        return send(res, 200, "application/json", JSON.stringify({ ok: false, error: String(e.message || e).slice(0, 240) }));
+        const msg = String(e.message || e).slice(0, 240);
+        lastSmtpLogin = { ok: false, at: Date.now(), error: msg };
+        return send(res, 200, "application/json", JSON.stringify({ ok: false, error: msg, code: e.code || null }));
       }
     }
 
@@ -567,8 +723,7 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === "/api/mail/smtp/send" && req.method === "POST") {
       try {
         const body = JSON.parse((await readBody(req)) || "{}");
-        const sm = smtpConfig(mailEnv());
-        if (!sm.ready) return send(res, 200, "application/json", JSON.stringify({ ok: false, error: "还没登录邮箱：填邮箱 + 授权码，先点「登录测试」" }));
+        const sm = await smtpForSend();
         const to = cleanStr(body.to, 120) || sm.user;
         const r = await sendMail(sm, {
           to,
@@ -591,8 +746,7 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === "/api/mail/verify" && req.method === "POST") {
       try {
         const body = JSON.parse((await readBody(req)) || "{}");
-        const sm = smtpConfig(mailEnv());
-        if (!sm.ready) return send(res, 200, "application/json", JSON.stringify({ ok: false, error: "验证要用你已登录的发信邮箱做 SMTP 探测，先在上面登录" }));
+        const sm = await smtpForSend();
         const list = Array.isArray(body.emails) ? body.emails : String(body.text || body.emails || "").split(/[\s,;]+/);
         const r = await verifyAddresses(sm, list);
         return send(res, 200, "application/json", JSON.stringify(r));

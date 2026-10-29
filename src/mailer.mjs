@@ -112,8 +112,8 @@ export const MAIL_GUIDES = {
     url: "https://myaccount.google.com/apppasswords",
     extraUrl: "https://myaccount.google.com/security",
     extraLabel: "先去开两步验证",
-    warn: "如果你看到的是「您要查找的设置不适用于您的账户」，只有三种可能：① 两步验证还没开（最常见）；② 这是公司/学校的 Google Workspace 账号，管理员禁用了应用密码；③ 账号开了「高级保护计划」。②③ 改不了，直接用 QQ / 163 邮箱。",
-    caution: "拿开发信来说，Gmail 是最麻烦的一条路：要先开两步验证，而且 smtp.gmail.com 在国内多数网络连不上。建议直接用 QQ 或 163 邮箱。",
+    warn: "如果你看到的是「您要查找的设置不适用于您的账户」：① 两步验证还没开（最常见，开了就好）；② 这是公司/学校的 Google Workspace 账号，管理员禁用了应用密码；③ 账号开了「高级保护计划」。②③ 改不了也不用换邮箱——直接用上面的「用 Google 账号授权」绕过应用密码。",
+    caution: "Gmail 的应用密码要先开两步验证；开不了也没关系——直接用下面「用 Google 账号授权」。注意 smtp.gmail.com 在国内要走代理。",
     note: "服务器 smtp.gmail.com、端口 465、SSL。",
   },
   outlook: {
@@ -521,7 +521,21 @@ async function openSession(cfg, steps = []) {
     let authOk = false;
     let usedMethod = "";
 
-    if (!methods.length || methods.includes("PLAIN")) {
+    if (cfg.auth === "xoauth2") {
+      // Gmail OAuth：把 user / bearer 拼成 SASL 串再 base64，不经过密码
+      const raw = `user=${user}\x01auth=Bearer ${cfg.accessToken || ""}\x01\x01`;
+      const r = await smtp.cmd(`AUTH XOAUTH2 ${Buffer.from(raw, "utf8").toString("base64")}`);
+      if (r.code === 235) {
+        authOk = true;
+        usedMethod = "XOAUTH2";
+      } else if (r.code === 334) {
+        // 失败时 Google 把错误塞在 334 的 base64 里，必须回一个空行才能拿到最终结果
+        await smtp.cmd("");
+        throw new Error("Gmail 拒绝了 OAuth 令牌：可能已过期或被撤销，回「邮箱」卡片点「重新授权」");
+      } else {
+        throw new Error(`AUTH XOAUTH2 失败（${r.code}）：${r.text.slice(0, 120)}`);
+      }
+    } else if (!methods.length || methods.includes("PLAIN")) {
       const token = Buffer.from(`\0${user}\0${pass}`, "utf8").toString("base64");
       const r = await smtp.cmd(`AUTH PLAIN ${token}`);
       if (r.code === 235) { authOk = true; usedMethod = "PLAIN"; }
@@ -574,7 +588,7 @@ function authError(host, r) {
 export async function smtpLogin(cfg) {
   const steps = [];
   if (!cfg.user) return { ok: false, error: "邮箱地址没填", steps };
-  if (!cfg.pass) return { ok: false, error: "密码 / 授权码没填", steps };
+  if (!cfg.pass && cfg.auth !== "xoauth2") return { ok: false, error: "密码 / 授权码没填", steps };
   if (!cfg.host) return { ok: false, error: "SMTP 服务器地址没填", steps };
   let smtp;
   try {
