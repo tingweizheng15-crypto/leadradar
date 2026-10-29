@@ -36,7 +36,7 @@ export function writeReport({ stats, leads, cfg, warnings }) {
   md.push(`生成时间：${isoCN()}　耗时：${stats.duration_s}s`, "");
   md.push(`- 数据源：${stats.source}　搜索就绪：${stats.search_ready ? "是" : "否"}　邮箱查找：${stats.email_finder}`, "");
   if (stats.search_ready) md.push(`- 本轮检索：${stats.search_queries} 条（失败 ${stats.search_failed || 0} 条）`, "");
-  md.push(`- 发现候选：${stats.candidates}　有效线索：${stats.leads}　合格(≥80)：${stats.qualified}　待复核：${stats.review}`, "");
+  md.push(`- 发现候选：${stats.candidates_found ?? stats.candidates}　实际抓取：${stats.candidates}　有效线索：${stats.leads}　合格(≥80)：${stats.qualified}　待复核：${stats.review}`, "");
   if (stats.search_ready && stats.dedupe_ttl) {
     md.push(`- 今日新发现：${stats.new_domains ?? "-"} 个域名　·　近 ${stats.dedupe_ttl} 天见过的回访：${stats.revisit_domains ?? 0} 条（回访只在当天没有新面孔时兜底补位）`, "");
   }
@@ -117,7 +117,7 @@ a{color:#be123c;text-decoration:none}.foot{font-size:11px;color:var(--ink3);line
 <div class="sub">生成于 ${isoCN()}　·　耗时 ${stats.duration_s}s　·　数据源 ${esc(stats.source)}　·　搜索就绪 ${stats.search_ready ? "是" : "否"}${stats.search_ready ? `　·　检索 ${stats.search_queries} 条（失败 ${stats.search_failed || 0}）` : ""}　·　邮箱查找 ${esc(stats.email_finder)}</div>
 <div class="kpis">
 <div class="kpi hot"><div class="k">有效线索</div><div class="v">${stats.leads}</div></div>
-<div class="kpi"><div class="k">发现候选</div><div class="v">${stats.candidates}</div>${stats.dedupe_ttl ? `<div class="ks">新域名 ${stats.new_domains ?? "-"}</div>` : ""}</div>
+<div class="kpi"><div class="k">实际抓取</div><div class="v">${stats.candidates}</div>${stats.candidates_found ? `<div class="ks">发现 ${stats.candidates_found} 个候选</div>` : (stats.dedupe_ttl ? `<div class="ks">新域名 ${stats.new_domains ?? "-"}</div>` : "")}</div>
 <div class="kpi"><div class="k">合格(≥80)</div><div class="v">${stats.qualified}</div></div>
 <div class="kpi"><div class="k">待复核</div><div class="v">${stats.review}</div></div>
 <div class="kpi"><div class="k">有邮箱</div><div class="v">${stats.with_email}</div><div class="ks">入选线索中</div></div>

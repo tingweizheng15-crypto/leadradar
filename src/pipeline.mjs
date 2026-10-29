@@ -33,7 +33,14 @@ function tldCountry(url) {
 // 平台站 / 目录站 / 登录墙站点：自动流水线一律不碰。
 // linkedin 是刻意排除的——个人主页在登录墙后，自动抓取既违反条款也拿不到可用信息；
 // LinkedIn 只在 lead-radar/social-sourcing.html 里当人工找人工具用，两条链路不混。
-const NOISE_RE = /(^|\.)(alibaba|aliexpress|made-in-china|globalsources|tradeindia|indiamart|dhgate|amazon|ebay|etsy|shopee|lazada|tokopedia|walmart|yellowpages|yelp|manta|kompass|europages|importyeti|panjiva|reddit|quora|pinterest|wikipedia|linkedin|twitter|youtube|google|bing)\./i;
+const NOISE_RE = /(^|\.)(alibaba|aliexpress|made-in-china|globalsources|tradeindia|indiamart|dhgate|amazon|ebay|etsy|shopee|lazada|tokopedia|walmart|yellowpages|yelp|manta|kompass|europages|importyeti|panjiva|reddit|quora|pinterest|wikipedia|linkedin|twitter|youtube|google|bing|coupang|gmarket|11st|auction|tmon|wemakeprice|smartstore\.naver|blog\.naver|tistory|brunch|medium|blogspot|wordpress|pantip|cafe\.daum|dcinside|clien|news\.naver|ruliweb|theqoo)\./i;
+
+/**
+ * 负向词：标题/摘要命中就直接跳过，别浪费一次 8 秒的抓取。
+ * 来源是实跑暴露的噪声——搜「압박 타이즈 / 압축 레깅스」时 Google 会大量返回
+ * 医用压力袜（의료용 압박스타킹）和测评博客，跟跑步服饰一点关系都没有。
+ */
+const NEG_RE = /의료|병원|간호|정맥|수술|압박\s*스타킹|메디컬|medical|hospital|nursing|varicose|surgery|리뷰|후기|블로그|카페\s*글|รีวิว|บทความ|review\s*:|reviewed|unboxing/i;
 
 export function isNoiseUrl(url) {
   const h = domainOf(url);
@@ -79,6 +86,7 @@ export async function discover(cfg) {
     const seen = new Set();
     const failures = [];
     let socialSkipped = 0;
+    let negSkipped = 0;
     const plan = buildQueries(cfg, { full: true });
     const social = cfg.search.include_social !== false ? buildSocialQueries(cfg) : [];
     // 预算按比例分配：主体拿 70%，社媒保底 30%，再交错排列
@@ -97,6 +105,8 @@ export async function discover(cfg) {
         const results = await search(cfg, q.q, cfg.search.results_per_query, { country: q.country });
         for (const r of results || []) {
           if (isNoiseUrl(r.url)) continue;
+          // 标题/摘要命中负向词（医用压力袜、测评博客、开箱视频）直接跳过
+          if (!isSocialUrl(r.url) && NEG_RE.test(`${r.title || ""} ${r.snippet || ""}`)) { negSkipped++; continue; }
           let dom;
           if (isSocialUrl(r.url)) {
             const sp = parseSocialUrl(r.url);
@@ -126,7 +136,8 @@ export async function discover(cfg) {
       await new Promise((r) => setTimeout(r, 120));
     }
     if (socialSkipped) console.log(`  [社媒] 跳过 ${socialSkipped} 个帖子页（URL 里没有用户名，抓不出品牌信息）`);
-    return { candidates, source: providerName(cfg), search: true, queries: planned.length, failed: failures.length, failures, socialSkipped, socialQueries: alloc.socialCount };
+    if (negSkipped) console.log(`  [过滤] 跳过 ${negSkipped} 条无关结果（医用压力袜 / 测评博客 / 开箱视频）`);
+    return { candidates, source: providerName(cfg), search: true, queries: planned.length, failed: failures.length, failures, socialSkipped, negSkipped, socialQueries: alloc.socialCount };
   }
   const seeds = seedLeads(cfg);
   return { candidates: seeds, source: "本地样本库（未配置搜索 key，仅官网/社媒公开信息）", search: false, queries: 0, failed: 0, failures: [] };
@@ -181,7 +192,11 @@ export async function runPipeline(cfg, opts = {}) {
     candidates = picked;
   }
   const max = cfg.report.max_candidates_per_run;
+  // 发现 ≠ 抓取：忽略去重时一次能发现上百个候选，真正抓的是前 max 个。
+  // 报告里必须分开写，否则「发现候选 132」会让人以为抓了 132 个站。
+  const picked = candidates.slice(0, max);
   const leads = [];
+  let medSkipped = 0;
 
   // 超时兜底：一定要 clearTimeout，否则每个候选都会留一个 45s 的空定时器，
   // 全部跑完后进程还要多挂 40 多秒才退出（定时器下一次排程会被拖后）。
@@ -193,7 +208,7 @@ export async function runPipeline(cfg, opts = {}) {
 
   const aiFailures = [];
 
-  for (const c of candidates.slice(0, max)) {
+  for (const c of picked) {
     try {
       const social = isSocialUrl(c.url);
       const en = await withTimeout(social ? enrichSocial(cfg, c.url) : enrichSite(cfg, c.url), 45000, null);
@@ -218,6 +233,16 @@ export async function runPipeline(cfg, opts = {}) {
         lead.revisit = true;
         lead.last_seen = c.lastSeen || "";
       }
+
+      // 医用压力袜兜底：韩国的 의료용 압박스타킹 品牌（sigvaris / megamed 这类）
+      // 标题里不一定出现「医用」，但正文一定有。宁可漏一条，也别把医疗器械当客户。
+      const MED_RE = /의료|의료기기|정맥류|혈전|병원용|압박\s*스타킹|탄력\s*스타킹|medical\s+(grade|compression)|varicose|thrombosis|hospital\s+use/i;
+      if (MED_RE.test(`${lead.name} ${lead.text}`.slice(0, 4000))) {
+        medSkipped++;
+        console.log(`  [过滤] 跳过医疗器械站：${lead.name || lead.domain}`);
+        continue;
+      }
+
       scoreLead(lead, cfg);
 
       if (llmReady(cfg)) {
@@ -272,7 +297,9 @@ export async function runPipeline(cfg, opts = {}) {
     search_queries: d.queries || 0,
     search_failed: d.failed || 0,
     email_finder: emailFinder,
-    candidates: candidates.length,
+    candidates: picked.length,
+    candidates_found: candidates.length,
+    medical_skipped: medSkipped,
     new_domains: newCount,
     revisit_domains: kept.filter((l) => l.revisit).length,
     dedupe_ttl: dedupeOn ? ttl : 0,
