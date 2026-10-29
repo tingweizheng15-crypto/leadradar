@@ -190,6 +190,14 @@
       </div>
     </div>
 
+    <div style="margin-bottom:14px;padding:10px 14px;border:1px dashed #dbe3ee;border-radius:10px;background:#fcfdfe">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <button class="ghost" id="b-qpreview">试跑前 5 条（看能搜到谁）</button>
+        <span class="kvsub" style="margin:0">只跑搜索，不抓官网、不写报告、不进跨天去重库。试跑的是下面「自定义检索式」<b>当前框里的内容，含未保存的改动</b>——换词前先用它看效果。</span>
+      </div>
+      <div id="qPreviewList" style="margin-top:10px;font-size:12px;line-height:1.9"></div>
+    </div>
+
     <div class="row"><label>检索式模板</label>
       <textarea id="qTemplates" rows="3" spellcheck="false" placeholder="{product} {buyer} {country}"></textarea>
     </div>
@@ -277,6 +285,7 @@
 const $ = (s) => document.querySelector(s);
 const api = (p, opt) => fetch(p, opt).then(r => r.json());
 let pollTimer = null, curJob = 0, lastLines = 0, LAST = null;
+let SAVED_CUSTOM = "";   // 已保存的自定义检索式，用来判断「改了没存」
 
 function toast(m){ const el=$("#toast"); el.textContent=m; el.classList.add("on"); clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove("on"),2400); }
 function pill(cls, label, val, goto){
@@ -369,6 +378,15 @@ function setRunning(on, label){
 }
 
 async function run(kind, label){
+  // 检索词改了没保存就开跑 = 白跑一轮，这里先拦一下
+  if(kind === "pipeline"){
+    const cur = $("#qCustom").value.trim();
+    if(cur !== SAVED_CUSTOM.trim()){
+      const ok = confirm("「自定义检索式」有未保存的改动，现在跑会用旧词。\n\n先保存再跑？（确定 = 保存后运行）");
+      if(ok){ await saveQueries(false); }
+      else { toast("已取消。改动还在框里，记得点保存"); return; }
+    }
+  }
   try{
     const r = await api("/api/run", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({kind}) });
     if(!r.ok){ toast(r.error || "启动失败"); return; }
@@ -439,6 +457,7 @@ async function loadQueries(){
   const q = await api("/api/queries");
   $("#qTemplates").value = (q.terms.query_templates || []).join("\n");
   $("#qCustom").value = (q.terms.custom_queries || []).join("\n");
+  SAVED_CUSTOM = $("#qCustom").value;
   $("#qMode").value = q.terms.custom_mode || "append";
   $("#qMax").value = q.terms.max_queries_per_run || 30;
 
@@ -576,6 +595,35 @@ $("#b-tapply").onclick = async ()=>{
   $("#qCustom").value = merged.join("\n");
   await saveQueries(false);
   toast(`已写入并保存 · 自定义检索式共 ${merged.length} 条`);
+};
+
+// 试跑：只跑搜索，看这些词到底能搜出谁（含噪声/已见标记），不消耗抓取时间
+$("#b-qpreview").onclick = async ()=>{
+  const lines = $("#qCustom").value.split("\n").map(s=>s.trim()).filter(Boolean);
+  if(!lines.length){ toast("「自定义检索式」是空的，先写几条词"); return; }
+  const btn = $("#b-qpreview");
+  btn.disabled = true;
+  $("#qPreviewList").innerHTML = '<span style="color:var(--ink3)">试跑中…（5 条约 5-10 秒，消耗 5 次检索额度）</span>';
+  try{
+    const r = await api("/api/queries/preview", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ queries: lines, limit: 5 }) });
+    if(!r.ok){ $("#qPreviewList").innerHTML = `<span style="color:var(--bad)">${esc(r.error || "试跑失败")}</span>`; return; }
+    const rows = r.items.map(it=>{
+      const list = it.results.map(x=>{
+        const tag = x.kind === "noise" ? '<span style="color:#b45309">平台/噪声</span>'
+                  : x.kind === "social-home" ? '<span style="color:#b45309">社媒首页</span>'
+                  : x.seen ? '<span style="color:#64748b">已见过</span>'
+                  : x.kind === "social" ? '<span style="color:#2563eb">社媒主页</span>'
+                  : '<span style="color:var(--ok)">可用</span>';
+        const name = x.kind === "social" ? x.label : x.domain;
+        return `<div style="padding-left:12px">${tag} <code>${esc(name)}</code> <span style="color:var(--ink3)">${esc(x.title)}</span></div>`;
+      }).join("");
+      return `<div style="margin-bottom:9px"><b>${esc(it.q)}</b> <span style="color:var(--ink3)">${it.country || "--"}</span>${list || '<div style="padding-left:12px;color:var(--ink3)">没有结果</div>'}</div>`;
+    }).join("");
+    $("#qPreviewList").innerHTML = rows
+      + `<div style="margin-top:8px;padding-top:8px;border-top:1px dashed #e3eaf3">这 ${r.spent} 条词里，<b style="color:var(--ok)">真正可用的新域名 ${r.kept} 个</b>（绿色）。`
+      + `去重库里已记 ${r.seenTotal} 个域名，标「已见过」的不会进报告——所以换词后如果可用的还是那几个，报告就会看起来一样。</div>`;
+  }catch(e){ $("#qPreviewList").innerHTML = `<span style="color:var(--bad)">${esc(String(e.message||e))}</span>`; }
+  finally{ btn.disabled = false; }
 };
 
 async function saveQueries(reset){

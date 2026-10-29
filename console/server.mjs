@@ -10,13 +10,15 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { loadConfig, loadEnvFile, ROOT, searchReady, llmReady, emailFinderReady } from "../src/config.mjs";
-import { providerName } from "../src/search.mjs";
+import { providerName, search } from "../src/search.mjs";
 import { findChrome } from "../src/enrich.mjs";
 import { jobsOf, parseHms, nextRunEpoch, fmt } from "../src/schedule.mjs";
 import { jobCommand, IS_SEA } from "../src/runner.mjs";
 import { buildQueries, allocateQueries, effectiveTerms, DEFAULTS } from "../src/query.mjs";
 import { buildSocialQueries } from "../src/social.mjs";
-import { seenStats } from "../src/store.mjs";
+import { seenStats, loadSeen } from "../src/store.mjs";
+import { isNoiseUrl } from "../src/pipeline.mjs";
+import { isSocialUrl, parseSocialUrl } from "../src/social.mjs";
 import { PLATFORMS, profileState, launchLogin, checkLogin, loginStatus } from "../src/browser.mjs";
 import { fetchProfile } from "../src/socialfetch.mjs";
 import { translateKeywords } from "../src/translate.mjs";
@@ -343,6 +345,59 @@ const server = http.createServer(async (req, res) => {
         if (!platform || !handle) return send(res, 200, "application/json", JSON.stringify({ ok: false, error: "需要 platform 和 handle" }));
         const r = await fetchProfile(platform, handle);
         return send(res, 200, "application/json", JSON.stringify(r));
+      } catch (e) {
+        return send(res, 200, "application/json", JSON.stringify({ ok: false, error: String(e.message || e).slice(0, 200) }));
+      }
+    }
+
+    // 试跑检索词：只看搜到谁，不抓官网、不写报告、不进去重库
+    if (url.pathname === "/api/queries/preview" && req.method === "POST") {
+      try {
+        const body = JSON.parse((await readBody(req)) || "{}");
+        const cfg = loadConfig();
+        if (!searchReady(cfg)) {
+          return send(res, 200, "application/json", JSON.stringify({ ok: false, error: "搜索 key 未配置，试跑只对真实搜索有效" }));
+        }
+        const raw = (Array.isArray(body.queries) ? body.queries : []).map((s) => String(s || "").trim()).filter(Boolean);
+        const limit = Math.min(10, Math.max(1, Number(body.limit) || 5));
+        // 借用 buildQueries 的国家/产品识别，保证 gl 参数和正式跑一致
+        const tmpCfg = { ...cfg, search: { ...cfg.search, custom_queries: raw, custom_mode: "replace", query_templates: [] } };
+        const plan = buildQueries(tmpCfg, { full: true });
+        const list = plan.queries.slice(0, limit);
+        if (!list.length) return send(res, 200, "application/json", JSON.stringify({ ok: false, error: "没有可试跑的检索式" }));
+        const seenMap = loadSeen() || {};
+        const items = [];
+        for (const it of list) {
+          const rows = await search(cfg, it.q, cfg.search.results_per_query, { country: it.country });
+          items.push({
+            q: it.q,
+            country: it.country || "",
+            results: (rows || []).map((r) => {
+              let host = "";
+              try { host = new URL(r.url).hostname.replace(/^www\./, ""); } catch { /* 坏 URL 当空 */ }
+              // 和正式跑用同一套判定：平台/噪声域名丢弃；社媒帖子页（无账号名）也丢；
+              // 社媒主页按 platform:handle 记，才算可用线索
+              const sp = isSocialUrl(r.url) ? parseSocialUrl(r.url) : null;
+              const kind = isNoiseUrl(r.url) ? "noise"
+                : (sp && (!sp.platform || !sp.handle)) ? "social-home"
+                : sp ? "social"
+                : "site";
+              const key = kind === "social" ? `${sp.platform}:${sp.handle}` : host;
+              return {
+                domain: host,
+                label: kind === "social" ? `${sp.platform}:${sp.handle}` : host,
+                title: String(r.title || "").slice(0, 70),
+                kind,
+                seen: Object.prototype.hasOwnProperty.call(seenMap, key)
+                  || Object.prototype.hasOwnProperty.call(seenMap, host)
+                  || Object.prototype.hasOwnProperty.call(seenMap, `www.${host}`),
+              };
+            }),
+          });
+          await new Promise((r) => setTimeout(r, 150));
+        }
+        const kept = items.reduce((n, x) => n + x.results.filter((r) => (r.kind === "site" || r.kind === "social") && !r.seen).length, 0);
+        return send(res, 200, "application/json", JSON.stringify({ ok: true, items, kept, spent: items.length, seenTotal: seenStats().total }));
       } catch (e) {
         return send(res, 200, "application/json", JSON.stringify({ ok: false, error: String(e.message || e).slice(0, 200) }));
       }

@@ -35,10 +35,11 @@ function tldCountry(url) {
 // LinkedIn 只在 lead-radar/social-sourcing.html 里当人工找人工具用，两条链路不混。
 const NOISE_RE = /(^|\.)(alibaba|aliexpress|made-in-china|globalsources|tradeindia|indiamart|dhgate|amazon|ebay|etsy|shopee|lazada|tokopedia|walmart|yellowpages|yelp|manta|kompass|europages|importyeti|panjiva|reddit|quora|pinterest|wikipedia|linkedin|twitter|youtube|google|bing)\./i;
 
-function isNoiseUrl(url) {
+export function isNoiseUrl(url) {
   const h = domainOf(url);
   return !h || NOISE_RE.test(h);
 }
+export { NOISE_RE };
 
 function seedLeads(cfg) {
   const seeds = [];
