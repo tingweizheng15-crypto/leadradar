@@ -279,7 +279,7 @@ async function proxyWorks(port) {
   } catch { return false; }
 }
 
-const ALLOWED_EXT = new Set([".html", ".md", ".csv", ".json", ".png", ".txt", ".log"]);
+const ALLOWED_EXT = new Set([".html", ".md", ".csv", ".json", ".png", ".jpg", ".jpeg", ".webp", ".gif", ".txt", ".log"]);
 
 /* ---------------- 邮箱配置 ---------------- */
 
@@ -448,17 +448,35 @@ function saveQueries(patch, reset = false) {
 }
 
 
-function serveFile(res, rel) {
+const MIME = {
+  ".html": "text/html; charset=utf-8",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".gif": "image/gif",
+  ".json": "application/json; charset=utf-8",
+  ".md": "text/plain; charset=utf-8",
+  ".csv": "text/plain; charset=utf-8",
+  ".log": "text/plain; charset=utf-8",
+  ".txt": "text/plain; charset=utf-8",
+};
+
+function serveFile(req, res, rel) {
   const abs = path.resolve(ROOT, rel);
   if (!abs.startsWith(ROOT + path.sep)) return send(res, 403, "text/plain; charset=utf-8", "forbidden");
-  if (!ALLOWED_EXT.has(path.extname(abs).toLowerCase())) return send(res, 403, "text/plain; charset=utf-8", "forbidden type");
-  if (!fs.existsSync(abs)) return send(res, 404, "text/plain; charset=utf-8", "not found");
   const ext = path.extname(abs).toLowerCase();
-  const type = ext === ".html" ? "text/html; charset=utf-8"
-    : ext === ".png" ? "image/png"
-      : ext === ".json" ? "application/json; charset=utf-8"
-        : "text/plain; charset=utf-8";
-  res.writeHead(200, { "Content-Type": type + (ext === ".png" ? "" : "") });
+  if (!ALLOWED_EXT.has(ext)) return send(res, 403, "text/plain; charset=utf-8", "forbidden type");
+  if (!fs.existsSync(abs) || !fs.statSync(abs).isFile()) return send(res, 404, "text/plain; charset=utf-8", "not found");
+
+  // 图片给缓存头：报告里同一张截图会重复出现，来回翻预览时不用反复读盘
+  const isImg = /^image\//.test(MIME[ext] || "");
+  res.writeHead(200, {
+    "Content-Type": MIME[ext] || "application/octet-stream",
+    "Cache-Control": isImg ? "private, max-age=600" : "no-store",
+    "Content-Length": fs.statSync(abs).size,
+  });
+  if (req.method === "HEAD") return res.end();
   fs.createReadStream(abs).pipe(res);
 }
 
@@ -941,8 +959,20 @@ ${ok ? "<script>setTimeout(()=>window.close(),1600)<\/script>" : ""}</html>`;
       return send(res, 200, "application/json", JSON.stringify({ ok: true, applied }));
     }
 
+    // 报告里的截图是相对路径（screenshots/xxx.png）。用 /files/<相对路径> 这种分层地址提供，
+    // 让它能按目录正确解析；原来的 /view?p=... 会把当前路径压成 /view，相对路径全变成 /screenshots/... → 404
+    if (url.pathname.startsWith("/files/")) {
+      return serveFile(req, res, decodeURIComponent(url.pathname.slice("/files/".length)));
+    }
+
     if (url.pathname === "/view") {
-      return serveFile(res, url.searchParams.get("p") || "");
+      const p = url.searchParams.get("p") || "";
+      // 老链接（含书签）还能用：HTML 转到分层地址，图片等仍直接给
+      if (/\.html?$/i.test(p)) {
+        res.writeHead(302, { Location: "/files/" + encodeURI(p).replace(/#/g, "%23"), "Cache-Control": "no-store" });
+        return res.end();
+      }
+      return serveFile(req, res, p);
     }
 
     return send(res, 404, "text/plain; charset=utf-8", "not found");

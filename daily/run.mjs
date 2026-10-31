@@ -348,7 +348,7 @@ const brief = await (async () => {
 const badge = (t) => t === "T0" ? "#be123c" : t === "T1" ? "#e11d48" : t === "T2" ? "#f59e0b" : "#94a3b8";
 const card = (r, i) => `
   <div class="item">
-    <div class="shot">${r.screenshot ? `<img src="${r.screenshot}" alt="${r.name}">` : `<div class="noshot">未截到图<br><span>${r.status === "error" ? "访问失败" : "页面不可渲染"}</span></div>`}</div>
+    <div class="shot">${r.screenshot ? `<img src="${r.screenshot}" alt="${r.name}" loading="lazy" decoding="async">` : `<div class="noshot">未截到图<br><span>${r.status === "error" ? "访问失败" : "页面不可渲染"}</span></div>`}</div>
     <div class="meta">
       <div class="top"><b>${r.name}</b><span class="ch">${r.channel}</span>
         <span class="tier" style="background:${badge(r.tier)}">${r.tier} ${r.tierLabel}</span></div>

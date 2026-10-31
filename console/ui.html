@@ -490,6 +490,11 @@ async function loadStatus(){
   if(s.job) syncJob(s.job);
 }
 
+function fileUrl(rel){
+  // 分段编码，保留 / 的层级：报告里的 screenshots/xxx.png 才能按目录解析到
+  return "/files/" + String(rel||"").split("/").map(encodeURIComponent).join("/");
+}
+
 function renderReports(list){
   if(!list.length){ $("#repList").innerHTML = '<div style="padding:6px 0">还没有报告。跑一次获客或每日采集就会出现在这里。</div>'; return; }
   $("#repList").innerHTML = list.map(r=>`
@@ -499,13 +504,13 @@ function renderReports(list){
       <span class="time">${new Date(r.mtime).toLocaleTimeString("zh-CN",{hour12:false})}${r.shots?` · ${r.shots} 张截图`:""}</span>
       <span class="sp"></span>
       <a href="#" data-view="${r.rel}">预览</a>
-      <a href="/view?p=${encodeURIComponent(r.rel)}" target="_blank" rel="noopener">新窗口 ↗</a>
+      <a href="${fileUrl(r.rel)}" target="_blank" rel="noopener">新窗口 ↗</a>
     </div>`).join("");
   document.querySelectorAll("[data-view]").forEach(a=>a.onclick=(e)=>{
     e.preventDefault();
     $("#previewWrap").style.display="block";
     $("#previewName").textContent = "预览：" + a.dataset.view;
-    $("#preview").src = "/view?p=" + encodeURIComponent(a.dataset.view);
+    $("#preview").src = fileUrl(a.dataset.view);
     $("#previewWrap").scrollIntoView({behavior:"smooth",block:"start"});
   });
 }
